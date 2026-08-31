@@ -24,9 +24,20 @@ def render_markdown(portfolio: dict[str, Any], audience: str) -> str:
             leverage = claim["value_leverage"]
             lines.append(f"Value leverage: **{leverage:.2f}x**." if leverage is not None
                          else "Value leverage cannot be calculated until realization cost is supplied.")
+        usage = claim.get("ai_usage", {})
+        if usage.get("baseline_eligible_signals") is not None:
+            lines += ["",
+                      f"AI-eligible baseline population: **{usage['baseline_eligible_signals']:,}**; "
+                      f"baseline AI calls: **{usage['baseline_ai_calls']:,}**; "
+                      f"Cascade AI calls: **{usage['cascade_ai_calls']:,}**."]
+        engineering = claim.get("engineering_cost", {})
+        if engineering.get("initial") or engineering.get("recurring"):
+            lines.append(
+                f"Engineering cost — initial: **${engineering['initial']:,.2f}**; "
+                f"recurring: **${engineering['recurring']:,.2f}**."
+            )
         if claim["gaps"]:
             lines += ["", "Evidence gaps:"] + [f"- {gap}" for gap in claim["gaps"]]
         lines.append("")
     lines += ["---", "This scorecard reports modeled evidence, not a guarantee of causation or savings."]
     return "\n".join(lines) + "\n"
-
