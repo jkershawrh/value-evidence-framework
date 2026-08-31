@@ -45,3 +45,13 @@ That is necessary but insufficient. A future maturity dimension will also score 
 cost, customer-specific engineering, time-to-value, evidence automation, and cohort repeatability.
 High value that depends on proportional services labor is still a cost-plus warning.
 
+## Shared route and effort evidence
+
+Compression is not an economic measure. Products may publish a route ledger that partitions the
+observed population into terminal outcomes and identifies AI eligibility, actual calls, tokens,
+runtime, and cost. An `unknown` route is valid and must not be silently counted as avoided AI.
+
+Products may also publish initial and recurring engineering effort by activity, role category,
+hours, loaded rate, and source. VEF includes those costs in realization cost and exposes them in
+both scorecards. Raw time records stay with the product or customer; the portable claim contains
+only the auditable aggregates needed for value analysis.

@@ -37,6 +37,36 @@ def validate_claim(claim: dict[str, Any]) -> list[str]:
         errors.append("realization_cost must be non-negative")
     if not claim["evidence"].get("sources"):
         errors.append("evidence.sources must contain at least one source")
+    for ledger_name in ("baseline_route_ledger", "cascade_route_ledger"):
+        ledger = claim["measurement"].get(ledger_name)
+        if ledger is not None:
+            errors.extend(_validate_route_ledger(ledger_name, ledger))
+    efforts = claim["financial_model"].get("engineering_effort", [])
+    for index, effort in enumerate(efforts):
+        prefix = f"financial_model.engineering_effort[{index}]"
+        if effort.get("lifecycle") not in {"initial", "recurring"}:
+            errors.append(f"{prefix}.lifecycle must be initial or recurring")
+        if min(Decimal(str(effort.get("hours", -1))),
+               Decimal(str(effort.get("loaded_rate_usd", -1)))) < 0:
+            errors.append(f"{prefix} hours and rate must be non-negative")
+    return errors
+
+
+def _validate_route_ledger(name: str, ledger: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    total = ledger.get("total_signals")
+    routes = ledger.get("routes", [])
+    if not isinstance(total, int) or total < 0:
+        return [f"measurement.{name}.total_signals must be a non-negative integer"]
+    route_total = sum(route.get("signal_count", 0) for route in routes)
+    call_total = sum(route.get("ai_calls", 0) for route in routes)
+    if route_total != total:
+        errors.append(f"measurement.{name} routes must partition total_signals")
+    if call_total != ledger.get("actual_ai_calls"):
+        errors.append(f"measurement.{name} route calls must equal actual_ai_calls")
+    for index, route in enumerate(routes):
+        if not route.get("ai_eligible", False) and route.get("ai_calls", 0):
+            errors.append(f"measurement.{name}.routes[{index}] non-eligible route has AI calls")
     return errors
 
 
@@ -72,6 +102,9 @@ def evaluate_claim(claim: dict[str, Any]) -> dict[str, Any]:
     adjusted = attributable * factor
     cost = Decimal(str(claim["realization_cost"]))
     rating, gaps = _rating(claim)
+    baseline = claim["measurement"].get("baseline_route_ledger", {})
+    cascade = claim["measurement"].get("cascade_route_ledger", {})
+    financial = claim["financial_model"]
     return {
         "id": claim["id"], "product": claim["product"], "outcome_id": claim["outcome_id"],
         "currency": claim["financial_model"].get("currency", "USD"),
@@ -80,6 +113,19 @@ def evaluate_claim(claim: dict[str, Any]) -> dict[str, Any]:
         "net_value": float(adjusted - cost),
         "value_leverage": float(adjusted / cost) if cost else None,
         "rating": rating, "gaps": gaps,
+        "ai_usage": {
+            "baseline_eligible_signals": baseline.get("ai_eligible_signals"),
+            "baseline_ai_calls": baseline.get("actual_ai_calls"),
+            "cascade_eligible_signals": cascade.get("ai_eligible_signals"),
+            "cascade_ai_calls": cascade.get("actual_ai_calls"),
+            "avoided_inference_cost": claim["measurement"].get(
+                "raw_inference_cost_avoided_usd"
+            ),
+        },
+        "engineering_cost": {
+            "initial": financial.get("initial_engineering_cost_usd", 0),
+            "recurring": financial.get("recurring_engineering_cost_usd", 0),
+        },
     }
 
 
@@ -100,4 +146,3 @@ def evaluate_portfolio(claims: list[dict[str, Any]]) -> dict[str, Any]:
                         "realization_cost", "net_value")
         },
     }
-
