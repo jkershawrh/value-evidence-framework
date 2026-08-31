@@ -6,3 +6,31 @@ __pycache__/
 dist/
 *.egg-info/
 
+# Secrets and local identity
+.env
+.env.*
+*.secrets*
+credentials*
+*secret*
+*.pem
+*.key
+*.p12
+kubeconfig*
+.kube/
+
+# Customer/internal evidence and generated reports
+evidence/
+value-claim*.json
+replay-result*.json
+customer-economics*.json
+customer-data/
+worklogs/
+scorecards/
+
+# Deployment state and local overrides
+deploy/
+values.local.yaml
+values-*.local.yaml
+*-deployment.local.yaml
+*.tfstate
+*.tfstate.*
