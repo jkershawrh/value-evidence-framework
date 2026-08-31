@@ -18,8 +18,8 @@ def render_markdown(portfolio: dict[str, Any], audience: str) -> str:
     lines += ["## Claims", ""]
     for claim in portfolio["claims"]:
         lines += [f"### {claim['product']}: {claim['id']} — {claim['rating'].upper()}", "",
-                  f"Attributable value: **${claim['attributable_value']:,.2f}**; "
-                  f"confidence-adjusted: **${claim['confidence_adjusted_value']:,.2f}**."]
+                  (f"Attributable value: **${claim['attributable_value']:,.2f}**; "
+                   f"confidence-adjusted: **${claim['confidence_adjusted_value']:,.2f}**.")]
         if audience == "red-hat":
             leverage = claim["value_leverage"]
             lines.append(f"Value leverage: **{leverage:.2f}x**." if leverage is not None
@@ -27,9 +27,10 @@ def render_markdown(portfolio: dict[str, Any], audience: str) -> str:
         usage = claim.get("ai_usage", {})
         if usage.get("baseline_eligible_signals") is not None:
             lines += ["",
-                      f"AI-eligible baseline population: **{usage['baseline_eligible_signals']:,}**; "
-                      f"baseline AI calls: **{usage['baseline_ai_calls']:,}**; "
-                      f"Cascade AI calls: **{usage['cascade_ai_calls']:,}**."]
+                      (f"AI-eligible baseline population: "
+                       f"**{usage['baseline_eligible_signals']:,}**; "
+                       f"baseline AI calls: **{usage['baseline_ai_calls']:,}**; "
+                       f"Cascade AI calls: **{usage['cascade_ai_calls']:,}**.")]
         engineering = claim.get("engineering_cost", {})
         if engineering.get("initial") or engineering.get("recurring"):
             lines.append(

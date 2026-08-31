@@ -6,7 +6,7 @@ from collections import defaultdict
 from decimal import Decimal
 from typing import Any
 
-CONFIDENCE_FACTORS = {"unverified": Decimal("0"), "low": Decimal("0.25"),
+CONFIDENCE_FACTORS = {"unverified": Decimal(0), "low": Decimal("0.25"),
                       "medium": Decimal("0.60"), "high": Decimal("0.85")}
 METHOD_STRENGTH = {"assertion": 0, "expert_estimate": 1, "modeled_baseline": 2,
                    "historical_baseline": 3, "interrupted_time_series": 4,
@@ -22,7 +22,7 @@ def validate_claim(claim: dict[str, Any]) -> list[str]:
     if errors:
         return errors
     share = Decimal(str(claim["attribution"].get("product_share", -1)))
-    if not Decimal("0") <= share <= Decimal("1"):
+    if not Decimal(0) <= share <= Decimal(1):
         errors.append("attribution.product_share must be between 0 and 1")
     confidence = claim["evidence"].get("confidence")
     if confidence not in CONFIDENCE_FACTORS:
