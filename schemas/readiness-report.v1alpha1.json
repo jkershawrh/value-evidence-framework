@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/jkershawrh/value-evidence-framework/schemas/readiness-report.v1alpha1.json",
+  "title": "VEF repository readiness report v1alpha1",
+  "type": "object",
+  "required": [
+    "schema_version", "repository", "grade", "proof_state", "cost_plus_state",
+    "categories", "findings", "implementation_options", "safety_warnings", "disclaimer"
+  ],
+  "properties": {
+    "schema_version": {"const": "vef.readiness.v1alpha1"},
+    "repository": {
+      "type": "object",
+      "required": ["name", "revision"],
+      "properties": {"name": {"type": "string"}, "revision": {"type": "string"}},
+      "additionalProperties": false
+    },
+    "grade": {
+      "type": "object",
+      "required": ["score", "rating", "raw_score", "caps"],
+      "properties": {
+        "score": {"type": "integer", "minimum": 0, "maximum": 100},
+        "raw_score": {"type": "integer", "minimum": 0, "maximum": 100},
+        "rating": {"enum": ["red", "amber", "green"]},
+        "caps": {"type": "array"}
+      },
+      "additionalProperties": false
+    },
+    "proof_state": {"enum": ["unproven", "directional", "decision-grade"]},
+    "cost_plus_state": {"enum": ["unknown", "risk", "scalable"]},
+    "categories": {"type": "array"},
+    "findings": {"type": "array"},
+    "implementation_options": {"type": "array"},
+    "safety_warnings": {"type": "array"},
+    "disclaimer": {"type": "string"}
+  },
+  "additionalProperties": false
+}

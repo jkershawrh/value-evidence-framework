@@ -24,6 +24,7 @@ shared runtime.
 python -m value_evidence.cli validate examples/claims.json
 python -m value_evidence.cli score examples/claims.json --audience customer
 python -m value_evidence.cli score examples/claims.json --audience red-hat
+python -m value_evidence.cli inspect /path/to/product --format markdown
 ```
 
 The examples are deliberately incomplete and therefore score red/amber. They are research
@@ -39,6 +40,15 @@ backlog examples, not assertions of realized customer ROI.
 6. A historical test result is not current deployment evidence.
 7. Scorecards expose assumptions and missing evidence alongside results.
 
-See [docs/methodology.md](docs/methodology.md), [docs/integration.md](docs/integration.md), and
-[docs/pilot.md](docs/pilot.md).
+See [docs/methodology.md](docs/methodology.md), [docs/integration.md](docs/integration.md),
+[docs/pilot.md](docs/pilot.md), and [docs/readiness-inspector.md](docs/readiness-inspector.md).
 
+## Repository readiness inspection
+
+`vef inspect` performs a local, read-only structural review and reports ROI evidence readiness on
+a red/amber/green 0–100 scale. It inspects tracked text structures without executing repository
+code or reading ignored and untracked evidence. Its proof state and cost-plus state are separate
+from the readiness grade; repository structure is never presented as proof of realized value.
+
+The packaged `skills/roi-evidence-readiness` Agent Skill explains the deterministic result and
+creates implementation plans. It cannot alter the grade or modify the inspected repository.

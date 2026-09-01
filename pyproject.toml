@@ -13,7 +13,7 @@ authors = [{name = "Jason Kershaw"}]
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.6"]
+dev = ["pytest>=8", "ruff>=0.6", "jsonschema>=4.20"]
 
 [project.scripts]
 vef = "value_evidence.cli:main"
@@ -27,4 +27,3 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
-

@@ -1,0 +1,4 @@
+interface:
+  display_name: "ROI Evidence Readiness"
+  short_description: "Grade ROI evidence readiness and plan improvements"
+  default_prompt: "Use $roi-evidence-readiness to grade this repository and provide a read-only implementation plan."

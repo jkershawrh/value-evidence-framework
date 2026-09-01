@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
+from .inspector import inspect_repository, load_policy, render_inspection_markdown
 from .model import evaluate_portfolio, validate_claim
 from .scorecard import render_markdown
 
@@ -22,7 +23,27 @@ def main() -> int:
     score.add_argument("file")
     score.add_argument("--audience", choices=("customer", "red-hat"), default="customer")
     score.add_argument("--format", choices=("markdown", "json"), default="markdown")
+    inspect = sub.add_parser("inspect")
+    inspect.add_argument("repo")
+    inspect.add_argument("--format", choices=("markdown", "json"), default="markdown")
+    inspect.add_argument("--output")
+    inspect.add_argument("--config")
     args = parser.parse_args()
+    if args.command == "inspect":
+        try:
+            default_policy = Path(args.repo) / ".vef" / "inspect.yaml"
+            policy_path = args.config or (str(default_policy) if default_policy.is_file() else None)
+            policy = load_policy(policy_path) if policy_path else None
+            report = inspect_repository(args.repo, policy=policy)
+        except (OSError, TypeError, ValueError) as exc:
+            parser.error(str(exc))
+        rendered = (json.dumps(report, indent=2, sort_keys=True) + "\n"
+                    if args.format == "json" else render_inspection_markdown(report))
+        if args.output:
+            Path(args.output).write_text(rendered)
+        else:
+            print(rendered, end="")
+        return 0
     claims = _claims(args.file)
     if args.command == "validate":
         failures = {claim.get("id", "unknown"): validate_claim(claim) for claim in claims}
@@ -37,4 +58,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
