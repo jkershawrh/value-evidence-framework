@@ -4,7 +4,12 @@ from pathlib import Path
 
 import jsonschema
 
-from value_evidence.inspector import inspect_repository, load_policy, render_inspection_markdown
+from value_evidence.inspector import (
+    _implementation_options,
+    inspect_repository,
+    load_policy,
+    render_inspection_markdown,
+)
 
 
 def repo(tmp_path: Path, files: dict[str, str]) -> Path:
@@ -81,7 +86,13 @@ def test_cascade_shaped_fixture_flags_persisted_content_and_economic_gaps(tmp_pa
     assert result["cost_plus_state"] == "unknown"
     assert result["proof_state"] != "decision-grade"
     assert "DATA-001" in result["implementation_options"][1]["addresses"]
-    assert result["implementation_options"][1]["title"] == "Privacy-safe persistence"
+
+
+def test_privacy_only_gap_gets_privacy_specific_options():
+    findings = [{"status": "met"}]
+    warnings = [{"id": "DATA-001"}]
+    options = _implementation_options(findings, warnings)
+    assert options[1]["title"] == "Privacy-safe persistence"
 
 
 def test_ignored_and_untracked_files_are_not_inspected(tmp_path):
