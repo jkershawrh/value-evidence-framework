@@ -79,6 +79,8 @@ def test_cascade_shaped_fixture_flags_persisted_content_and_economic_gaps(tmp_pa
     assert result["safety_warnings"][0]["id"] == "DATA-001"
     assert next(f for f in result["findings"] if f["id"] == "ECON-001")["status"] == "met"
     assert result["cost_plus_state"] == "unknown"
+    assert result["proof_state"] != "decision-grade"
+    assert "DATA-001" in result["implementation_options"][1]["addresses"]
 
 
 def test_ignored_and_untracked_files_are_not_inspected(tmp_path):

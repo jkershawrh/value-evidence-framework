@@ -45,15 +45,16 @@ RULES = (
     Rule("CBT-002", "CBT", 10, ("counterfactual", "competing_factors", "method"),
          "Record the comparison method and competing explanations.",
          "The no-product world or alternative explanations are not represented."),
-    Rule("SAFE-001", "Safety", 10, ("product_share", "dangerous_miss", "financial"),
+    Rule("SAFE-001", "Safety", 10,
+         ("product_share", "dangerous_misses", "value_eligible"),
          "Fail financial claims closed on safety failures and constrain attribution.",
          "Unsafe outcomes or shared value can still produce an uncapped claim.", True),
     Rule("ECON-001", "Economics", 10,
-         ("actual_ai_calls", "input_tokens", "inference_cost"),
+         ("actual_ai_calls", "input_tokens", "inference_cost_usd"),
          "Measure actual AI participation, tokens, and inference cost.",
          "Compression is used without measured AI consumption."),
     Rule("ECON-002", "Economics", 10,
-         ("engineering_effort", "recurring", "loaded_rate"),
+         ("engineering_effort", "recurring", "loaded_rate_usd"),
          "Capture initial and recurring ruleset/engineering effort at loaded rates.",
          "Realization cost omits bounded engineering effort."),
     Rule("TDD-001", "TDD", 10, ("negative", "replay", "deterministic"),
@@ -236,7 +237,7 @@ def inspect_repository(path: str | Path, policy: dict[str, Any] | None = None) -
         caps.append((49, "sensitive payload fields in evidence/report structures"))
     score = min([raw_score, *(cap for cap, _ in caps)])
     rating = "green" if score >= 80 else "amber" if score >= 50 else "red"
-    proof_state = _proof_state(findings)
+    proof_state = _proof_state(findings, safety_warnings)
     cost_plus = _cost_plus_state(index)
     categories = [{"id": name, "score": category_scores[name], "max_score": maximum}
                   for name, maximum in CATEGORY_MAX.items()]
@@ -247,7 +248,7 @@ def inspect_repository(path: str | Path, policy: dict[str, Any] | None = None) -
                   "caps": [{"maximum": cap, "reason": reason} for cap, reason in sorted(caps)]},
         "proof_state": proof_state, "cost_plus_state": cost_plus,
         "categories": categories, "findings": findings,
-        "implementation_options": _implementation_options(findings),
+        "implementation_options": _implementation_options(findings, safety_warnings),
         "safety_warnings": safety_warnings,
         "disclaimer": "Repository structure indicates readiness; it is not proof of realized value.",
     }
@@ -284,9 +285,9 @@ def _safety_warnings(index: dict[str, list[dict[str, Any]]]) -> list[dict[str, A
     return warnings
 
 
-def _proof_state(findings: list[dict[str, Any]]) -> str:
+def _proof_state(findings: list[dict[str, Any]], safety_warnings: list[dict[str, Any]]) -> str:
     met = {f["id"] for f in findings if f["status"] == "met"}
-    if {"CBT-001", "SAFE-001", "ECON-001", "TDD-001"} <= met:
+    if not safety_warnings and {"CBT-001", "SAFE-001", "ECON-001", "TDD-001"} <= met:
         return "decision-grade"
     if met & {"EDD-001", "CDD-001", "CBT-001"}:
         return "directional"
@@ -301,8 +302,10 @@ def _cost_plus_state(index: dict[str, list[dict[str, Any]]]) -> str:
     return "risk" if risk else "scalable"
 
 
-def _implementation_options(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _implementation_options(findings: list[dict[str, Any]],
+                            safety_warnings: list[dict[str, Any]]) -> list[dict[str, Any]]:
     gaps = [f["id"] for f in findings if f["status"] != "met"]
+    gaps.extend(warning["id"] for warning in safety_warnings)
     if not gaps:
         return []
     return [
