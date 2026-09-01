@@ -308,6 +308,15 @@ def _implementation_options(findings: list[dict[str, Any]],
     gaps.extend(warning["id"] for warning in safety_warnings)
     if not gaps:
         return []
+    if safety_warnings and not any(f["status"] != "met" for f in findings):
+        return [
+            {"level": "minimum", "title": "Minimum privacy structure", "addresses": gaps,
+             "changes": ["Exclude raw payload fields from ROI exports and document retention."]},
+            {"level": "recommended", "title": "Privacy-safe persistence", "addresses": gaps,
+             "changes": ["Persist hashes and approved aggregates; migrate and expire raw evidence."]},
+            {"level": "advanced", "title": "Automated privacy governance", "addresses": gaps,
+             "changes": ["Enforce field allowlists, retention controls, and privacy contract tests."]},
+        ]
     return [
         {"level": "minimum", "title": "Minimum evidence structure", "addresses": gaps,
          "changes": ["Add versioned aggregate evidence fields and validation tests."]},
@@ -329,7 +338,10 @@ def render_inspection_markdown(report: dict[str, Any]) -> str:
         lines.append(f"- {category['id']}: {category['score']}/{category['max_score']}")
     lines += ["", "## Evidence gaps", ""]
     gaps = [f for f in report["findings"] if f["status"] != "met"]
-    lines.extend(f"- **{f['id']} ({f['status']}):** {f['missing_capability']}" for f in gaps)
+    if gaps:
+        lines.extend(f"- **{f['id']} ({f['status']}):** {f['missing_capability']}" for f in gaps)
+    else:
+        lines.append("- None in the structural rubric.")
     if report["safety_warnings"]:
         lines += ["", "## Safety warnings", ""]
         lines.extend(f"- **{w['id']}:** {w['message']}" for w in report["safety_warnings"])
