@@ -176,7 +176,7 @@ def _symbols(path: Path) -> dict[str, list[int]]:
 def _tokens(value: str) -> set[str]:
     normalized = "".join(ch.lower() if ch.isalnum() else "_" for ch in value)
     pieces = {p for p in normalized.split("_") if len(p) > 2}
-    pieces.add(normalized)
+    pieces.update((normalized, f"exact:{normalized}"))
     return pieces
 
 
@@ -255,11 +255,16 @@ def inspect_repository(path: str | Path, policy: dict[str, Any] | None = None) -
 
 
 def _safety_warnings(index: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    def production_ref(ref: dict[str, Any]) -> bool:
+        parts = Path(ref["path"]).parts
+        return not any(part == "tests" or part.startswith("test_") for part in parts)
+
     sensitive = {"signal_content", "customer_payload", "raw_payload", "secret_value"}
     warnings = []
-    for token in sorted(sensitive & set(index)):
-        refs = [r for r in index[token] if any(word in r["path"].lower()
-                for word in ("evidence", "report", "export", "scorecard"))]
+    for token in sorted(sensitive):
+        refs = [r for r in index.get(f"exact:{token}", []) if production_ref(r)
+                and any(word in r["path"].lower()
+                        for word in ("evidence", "report", "export", "scorecard"))]
         if refs:
             warnings.append({"id": "DATA-001", "severity": "critical",
                              "message": "Sensitive payload field appears in an evidence/report structure.",
@@ -267,16 +272,21 @@ def _safety_warnings(index: dict[str, list[dict[str, Any]]]) -> list[dict[str, A
     # A signal payload persisted in a memory/evidence record is sensitive even when its
     # contract represents the two fields separately. Only paths and field names influence this.
     paths = {token: {r["path"] for r in refs} for token, refs in index.items()}
-    signal_paths = paths.get("signal", set()) | paths.get("signal_type", set())
-    content_paths = paths.get("content", set())
+    signal_paths = paths.get("exact:signal", set()) | paths.get("exact:signal_type", set())
+    content_paths = paths.get("exact:content", set())
     persistence_paths: set[str] = set()
-    for token in ("memory_id", "archive", "persisted", "jsonl", "evidence"):
-        persistence_paths |= paths.get(token, set())
-    raw_paths = sorted(signal_paths & content_paths & persistence_paths)
+    for token in ("memory_id", "archive", "persisted", "jsonl"):
+        persistence_paths |= paths.get(f"exact:{token}", set())
+    persistence_names = ("memory", "evidence", "report", "export", "ledger", "state")
+    raw_paths = sorted(
+        path for path in signal_paths & content_paths & persistence_paths
+        if production_ref({"path": path})
+        if any(name in path.lower() for name in persistence_names)
+    )
     if raw_paths and not warnings:
         refs = []
         for path in raw_paths[:3]:
-            candidates = [r for r in index.get("content", []) if r["path"] == path]
+            candidates = [r for r in index.get("exact:content", []) if r["path"] == path]
             refs.append(candidates[0] if candidates else {"path": path, "line": 1,
                                                           "kind": "structural"})
         warnings.append({"id": "DATA-001", "severity": "critical",

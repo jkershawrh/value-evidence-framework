@@ -75,6 +75,18 @@ def test_sensitive_report_field_warns_without_copying_value(tmp_path):
     assert result["grade"]["score"] <= 49
 
 
+def test_in_memory_collector_content_is_not_misclassified_as_persistence(tmp_path):
+    root = repo(tmp_path, {"collectors/jira.py":
+        "FIELDS = ['signal_type', 'content', 'archive']\n"})
+    assert inspect_repository(root)["safety_warnings"] == []
+
+
+def test_raw_synthetic_test_record_does_not_create_production_warning(tmp_path):
+    root = repo(tmp_path, {"tests/test_memory.py":
+        "FIELDS = ['memory_id', 'signal_type', 'content', 'archive']\n"})
+    assert inspect_repository(root)["safety_warnings"] == []
+
+
 def test_cascade_shaped_fixture_flags_persisted_content_and_economic_gaps(tmp_path):
     fixture = Path(__file__).parent / "fixtures/cascade-readiness/evidence.py"
     tests = "def test_contract():\n    baseline = workload_digest = total_signals = validate = value_evidence = True\n"
