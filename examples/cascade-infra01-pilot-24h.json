@@ -1,0 +1,225 @@
+{
+  "_description": "Estimated 24h pilot claim for cascade-compression deployed on infra01 (2026-08-28), observing RHPDS-wide signals. Cascade runs on infra01 but ingests signals from across the RHPDS fleet — the 1000-signal population represents platform-wide volume, not a single cluster. Numbers are guestimates from observed pilot data — not customer-validated.",
+  "_data_sources": {
+    "replay": "tests/fixtures/value_evidence/replay.json (1000 signals, matched workload across RHPDS)",
+    "ground_truth": "classifier-ground-truth-infra01-20260828.jsonl (43 adjudicated signals from RHPDS fleet)",
+    "review": "classifier-review-infra01-20260828.jsonl (43 signals with full metadata)",
+    "soak_test": "benchmarks/results/phase1-soak-results.json (30-pod CPU inference cluster)"
+  },
+  "claims": [
+    {
+      "id": "cascade.full-business-impact",
+      "product": "cascade-compression",
+      "outcome_id": "rhpds-via-infra01-pilot-24h:sha256:matched-pilot-fixture:2026-Q3",
+      "value_type": "cost_avoidance",
+      "measurement": {
+        "observed": 470,
+        "unit": "model_calls_avoided",
+        "period": "2026-Q3-24h-pilot",
+        "raw_calls_avoided": 470,
+        "raw_inference_cost_avoided_usd": 46.00,
+        "pilot_signal_population": 1000,
+        "ground_truth_sample": 43,
+        "ground_truth_breakdown": {
+          "needs_attention": 36,
+          "known_pattern": 6,
+          "real_incident": 1
+        },
+        "severity_breakdown": {
+          "critical": 1,
+          "high": 9,
+          "medium": 33
+        },
+        "baseline_route_ledger": {
+          "total_signals": 1000,
+          "ai_eligible_signals": 600,
+          "actual_ai_calls": 600,
+          "routes": [
+            {"route": "deduplicated", "signal_count": 200, "ai_eligible": false, "ai_calls": 0},
+            {"route": "existing_rules", "signal_count": 200, "ai_eligible": false, "ai_calls": 0},
+            {"route": "baseline_ai", "signal_count": 600, "ai_eligible": true, "ai_calls": 600,
+             "input_tokens": 90000, "output_tokens": 12000, "inference_seconds": 480.0, "inference_cost_usd": 60.0}
+          ]
+        },
+        "cascade_route_ledger": {
+          "total_signals": 1000,
+          "ai_eligible_signals": 800,
+          "actual_ai_calls": 130,
+          "routes": [
+            {"route": "deduplicated", "signal_count": 200, "ai_eligible": false, "ai_calls": 0},
+            {"route": "nano", "signal_count": 470, "ai_eligible": true, "ai_calls": 0},
+            {"route": "micro", "signal_count": 250, "ai_eligible": true, "ai_calls": 80,
+             "input_tokens": 12000, "output_tokens": 1600, "inference_seconds": 20.0, "inference_cost_usd": 4.0},
+            {"route": "macro", "signal_count": 80, "ai_eligible": true, "ai_calls": 50,
+             "input_tokens": 10000, "output_tokens": 2500, "inference_seconds": 45.0, "inference_cost_usd": 10.0}
+          ]
+        }
+      },
+      "counterfactual": {
+        "method": "matched_control",
+        "expected_without_product": 600,
+        "matched_workload": true
+      },
+      "attribution": {
+        "product_share": 1.0,
+        "competing_factors": ["workload_mix", "model_routing", "unit_cost_assumption", "signal_volume_extrapolation"]
+      },
+      "financial_model": {
+        "gross_value": 2494.71,
+        "currency": "USD",
+        "customer_validated": false,
+        "value_dimensions": [
+          {
+            "dimension": "inference_cost_avoided",
+            "inputs": {
+              "observed_cost_difference_usd": 46.00
+            },
+            "source": "paired_replay_route_cost",
+            "confidence": "medium",
+            "evidence_basis": "observed",
+            "_notes": "Baseline inference $60.00 (600 calls) minus cascade inference $14.00 (130 calls). Observed from route ledger, not modeled."
+          },
+          {
+            "dimension": "infrastructure_cost_avoided",
+            "inputs": {
+              "mode": "on_prem",
+              "units_avoided": 0.017,
+              "hardware_cost_per_unit_usd": 30000,
+              "power_watts": 1200
+            },
+            "source": "soak_test_hardware_profiles",
+            "confidence": "low",
+            "evidence_basis": "estimated",
+            "_notes": "Phase-1 soak used 30 pods on Xeon 6767P ($30k, 1200W). 78% compression means ~23 fewer pods needed at scale. Prorated to 24h pilot: 0.017 unit-days. This is a projection, not observed savings on actual hardware allocation."
+          },
+          {
+            "dimension": "human_operational_cost_avoided",
+            "inputs": {
+              "signals_not_requiring_human_review": 470,
+              "human_touch_rate": 0.20,
+              "avg_triage_minutes_per_signal": 3.0,
+              "avg_investigation_minutes_per_signal": 8.0,
+              "loaded_hourly_rate_usd": 95.0
+            },
+            "source": "infra01_ground_truth_extrapolation",
+            "confidence": "medium",
+            "evidence_basis": "estimated",
+            "_notes": "470 signals handled by nano agents. human_touch_rate 0.20 accounts for existing automation (PagerDuty grouping, silence rules, on-call fatigue/ignoring) — only ~20% of these would have actually consumed an engineer's attention. Investigation reduced to 8 min from 15 min default because infra01 K8s events have structured context, most are glance-and-dismiss. Rate $95/hr for RHDP platform SRE with benefits."
+          },
+          {
+            "dimension": "incident_response_value",
+            "inputs": {
+              "incident_count": 1,
+              "baseline_mttr_minutes": 45,
+              "improved_mttr_minutes": 15,
+              "cost_per_minute_of_incident_usd": 5.00
+            },
+            "source": "infra01_ground_truth_single_incident",
+            "confidence": "low",
+            "evidence_basis": "estimated",
+            "_notes": "1 real_incident in ground truth (pool_exhausted). Baseline MTTR 45 min from RHDP ops. Improved MTTR 15 min assumes cascade surfaces it sooner. Cost $5/min = $300/hr — 2 engineers at $95/hr loaded + modest coordination overhead. Conservative; does not include opportunity cost or downstream user impact. Single incident in 24h is too small a sample for statistical confidence."
+          },
+          {
+            "dimension": "downstream_business_impact",
+            "inputs": {
+              "support_ticket_cost_usd": 35.0,
+              "tickets_avoided": 2,
+              "user_productivity_cost_per_hour_usd": 75.0,
+              "hours_preserved": 1.0
+            },
+            "source": "infra01_provision_failure_estimate",
+            "confidence": "low",
+            "evidence_basis": "estimated",
+            "_notes": "5 provision_failed signals in ground truth but not all would generate tickets — most are auto-retried. Conservatively 2 tickets from the failures that actually blocked a user. 1 hour total productivity preserved (2 users × 30 min wait). No actual ticket data from pilot."
+          },
+          {
+            "dimension": "organizational_knowledge_value",
+            "inputs": {
+              "decisions_informed_per_period": 10,
+              "avg_decision_time_saved_minutes": 12,
+              "loaded_hourly_rate_usd": 90,
+              "new_hires_per_year": 4,
+              "onboarding_weeks_reduction": 3,
+              "new_hire_loaded_cost_per_week_usd": 3400,
+              "knowledge_consumers": 20,
+              "annual_departure_rate": 0.13,
+              "knowledge_loss_per_departure_usd": 50000,
+              "knowledge_retention_factor": 0.30,
+              "knowledge_domains": ["kubernetes", "aap", "jira", "confluence", "github"]
+            },
+            "source": "post_hardening_estimate_no_memory_data",
+            "confidence": "unverified",
+            "evidence_basis": "estimated",
+            "_notes": "The 72h pre-hardening run (10,964 memories, 462 causal links) had a bug that was fixed — those numbers are not usable. No post-hardening memory production data exists yet for this pilot. Decision acceleration halved to 10/day as a placeholder until recall-to-decision tracking is instrumented. Knowledge retention factor reduced to 0.30 (from 0.40) since we cannot verify what the post-fix memory system actually captures. memories_formed and causal_links_discovered omitted — no valid post-fix counts. This entire dimension is unverified and should be replaced with observed data from a post-hardening memory production run."
+          },
+          {
+            "dimension": "human_cost_of_ownership",
+            "inputs": {
+              "fte_displaced": 0.5,
+              "annual_loaded_cost_per_fte_usd": 165000,
+              "current_headcount_in_function": 6,
+              "reskilling_pathway": [
+                {
+                  "from": "Alert triage / noise filtering",
+                  "to": "Incident analysis and root-cause engineering",
+                  "fte": 0.3,
+                  "status": "planned",
+                  "timeline": "2026-Q4"
+                },
+                {
+                  "from": "Alert triage / noise filtering",
+                  "to": "Cascade rule authoring and validation",
+                  "fte": 0.2,
+                  "status": "in_progress",
+                  "timeline": "2026-Q3"
+                }
+              ]
+            },
+            "source": "infra01_operational_estimate",
+            "confidence": "low",
+            "evidence_basis": "estimated",
+            "_notes": "Cascade handles 94 effective signals/day that would have consumed ~17h of triage work. That's roughly 2 FTE of shift work, but cascade doesn't eliminate the on-call role — it removes the worst part (noise triage). 0.5 FTE represents partial displacement across a 6-person RHPDS platform team (8.3% displacement ratio). Reskilling pathway: 0.3 FTE redirected to incident analysis, 0.2 FTE to cascade rule authoring — both higher-value work that leverages existing domain knowledge."
+          }
+        ],
+        "engineering_effort": [
+          {
+            "activity": "rule_authoring",
+            "role": "platform_engineer",
+            "hours": 0.20,
+            "loaded_rate_usd": 95.0,
+            "lifecycle": "initial",
+            "source": "pilot_work_log"
+          },
+          {
+            "activity": "drift_review",
+            "role": "platform_engineer",
+            "hours": 0.10,
+            "loaded_rate_usd": 95.0,
+            "lifecycle": "recurring",
+            "source": "pilot_work_log"
+          },
+          {
+            "activity": "ground_truth_adjudication",
+            "role": "platform_engineer",
+            "hours": 1.50,
+            "loaded_rate_usd": 95.0,
+            "lifecycle": "initial",
+            "source": "pilot_work_log",
+            "_notes": "43 signals manually reviewed and labeled for classifier calibration"
+          }
+        ],
+        "initial_engineering_cost_usd": 161.50,
+        "recurring_engineering_cost_usd": 9.50
+      },
+      "evidence": {
+        "confidence": "medium",
+        "sources": ["paired_replay", "customer_economics", "shadow_validation", "ground_truth_adjudication"],
+        "reproducible": true,
+        "dangerous_misses": 0,
+        "shadow_validation_coverage": 1.0,
+        "value_eligible": true
+      },
+      "realization_cost": 176.00
+    }
+  ]
+}

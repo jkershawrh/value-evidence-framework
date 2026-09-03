@@ -3,6 +3,67 @@ from __future__ import annotations
 from typing import Any
 
 
+_DIMENSION_LABELS = {
+    "inference_cost_avoided": "Inference cost avoided",
+    "infrastructure_cost_avoided": "Infrastructure cost avoided",
+    "human_operational_cost_avoided": "Human operational cost avoided",
+    "incident_response_value": "Incident response value",
+    "downstream_business_impact": "Downstream business impact",
+    "organizational_knowledge_value": "Organizational knowledge value (OKV)",
+    "human_cost_of_ownership": "Human cost of ownership (HCO)",
+}
+
+
+def _render_dimensions(dims: list[dict[str, Any]], audience: str) -> list[str]:
+    """Render value dimension breakdown lines."""
+    value_dims = [d for d in dims if not d.get("is_cost")]
+    cost_dims = [d for d in dims if d.get("is_cost")]
+
+    lines = ["", "Value dimensions:"]
+    for dim in value_dims:
+        label = _DIMENSION_LABELS.get(dim["dimension"], dim["dimension"])
+        basis = dim.get("evidence_basis", "unknown")
+        conf = dim.get("confidence", "unknown")
+        value = dim.get("value_usd", 0)
+        line = f"- {label}: **${value:,.2f}**"
+        if audience == "red-hat":
+            line += f" (confidence: {conf}, basis: {basis}, source: {dim.get('source', '—')})"
+        else:
+            line += f" ({basis})"
+        lines.append(line)
+
+    if cost_dims:
+        lines.append("")
+        lines.append("Cost dimensions (subtracted from gross value):")
+        for dim in cost_dims:
+            label = _DIMENSION_LABELS.get(dim["dimension"], dim["dimension"])
+            basis = dim.get("evidence_basis", "unknown")
+            conf = dim.get("confidence", "unknown")
+            value = dim.get("value_usd", 0)
+            line = f"- {label}: **−${value:,.2f}**"
+            if audience == "red-hat":
+                line += f" (confidence: {conf}, basis: {basis}, source: {dim.get('source', '—')})"
+            else:
+                line += f" ({basis})"
+            lines.append(line)
+            ratio = dim.get("displacement_ratio")
+            if ratio is not None:
+                pct = ratio * 100
+                lines.append(
+                    f"  - Displacement ratio: **{pct:.1f}%** of function headcount"
+                )
+            pathway = dim.get("reskilling_pathway")
+            if pathway:
+                lines.append("  - Reskilling pathway:")
+                for entry in pathway:
+                    from_role = entry.get("from", "—")
+                    to_role = entry.get("to", "—")
+                    status = entry.get("status", "planned")
+                    lines.append(f"    - {from_role} → {to_role} ({status})")
+
+    return lines
+
+
 def render_markdown(portfolio: dict[str, Any], audience: str) -> str:
     title = "Customer Value Scorecard" if audience == "customer" else "Red Hat Product Scorecard"
     total = portfolio["totals"]
@@ -24,6 +85,9 @@ def render_markdown(portfolio: dict[str, Any], audience: str) -> str:
             leverage = claim["value_leverage"]
             lines.append(f"Value leverage: **{leverage:.2f}x**." if leverage is not None
                          else "Value leverage cannot be calculated until realization cost is supplied.")
+        dims = claim.get("value_dimensions")
+        if dims:
+            lines += _render_dimensions(dims, audience)
         usage = claim.get("ai_usage", {})
         if usage.get("baseline_eligible_signals") is not None:
             lines += ["",

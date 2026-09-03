@@ -6,6 +6,8 @@ from collections import defaultdict
 from decimal import Decimal
 from typing import Any
 
+from .dimensions import evaluate_dimensions, validate_dimensions
+
 CONFIDENCE_FACTORS = {"unverified": Decimal(0), "low": Decimal("0.25"),
                       "medium": Decimal("0.60"), "high": Decimal("0.85")}
 METHOD_STRENGTH = {"assertion": 0, "expert_estimate": 1, "modeled_baseline": 2,
@@ -49,6 +51,9 @@ def validate_claim(claim: dict[str, Any]) -> list[str]:
         if min(Decimal(str(effort.get("hours", -1))),
                Decimal(str(effort.get("loaded_rate_usd", -1)))) < 0:
             errors.append(f"{prefix} hours and rate must be non-negative")
+    dims = claim["financial_model"].get("value_dimensions")
+    if dims is not None:
+        errors.extend(validate_dimensions(dims))
     return errors
 
 
@@ -105,7 +110,11 @@ def evaluate_claim(claim: dict[str, Any]) -> dict[str, Any]:
     baseline = claim["measurement"].get("baseline_route_ledger", {})
     cascade = claim["measurement"].get("cascade_route_ledger", {})
     financial = claim["financial_model"]
-    return {
+
+    dims_raw = financial.get("value_dimensions")
+    dims_evaluated = evaluate_dimensions(dims_raw) if dims_raw else None
+
+    result: dict[str, Any] = {
         "id": claim["id"], "product": claim["product"], "outcome_id": claim["outcome_id"],
         "currency": claim["financial_model"].get("currency", "USD"),
         "gross_value": float(gross), "attributable_value": float(attributable),
@@ -127,6 +136,11 @@ def evaluate_claim(claim: dict[str, Any]) -> dict[str, Any]:
             "recurring": financial.get("recurring_engineering_cost_usd", 0),
         },
     }
+
+    if dims_evaluated:
+        result["value_dimensions"] = dims_evaluated
+
+    return result
 
 
 def evaluate_portfolio(claims: list[dict[str, Any]]) -> dict[str, Any]:

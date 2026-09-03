@@ -86,3 +86,70 @@ def test_route_ledger_rejects_compression_as_unaccounted_savings():
     }
     errors = validate_claim(detailed)
     assert "measurement.baseline_route_ledger routes must partition total_signals" in errors
+
+
+# --- value_dimensions integration ---
+
+def test_claim_without_dimensions_still_works():
+    """Backward compat: claims with no value_dimensions evaluate as before."""
+    result = evaluate_claim(claim())
+    assert "value_dimensions" not in result
+    assert result["gross_value"] == 1000
+
+
+def test_claim_with_dimensions_includes_breakdown():
+    c = claim()
+    c["financial_model"]["value_dimensions"] = [
+        {
+            "dimension": "inference_cost_avoided",
+            "inputs": {"calls_avoided": 470, "cost_per_call_usd": 0.10},
+            "source": "replay",
+            "confidence": "medium",
+            "evidence_basis": "observed",
+        },
+        {
+            "dimension": "human_operational_cost_avoided",
+            "inputs": {"signals_not_requiring_human_review": 470},
+            "source": "pilot_work_log",
+            "confidence": "medium",
+            "evidence_basis": "estimated",
+        },
+    ]
+    errors = validate_claim(c)
+    assert errors == []
+    result = evaluate_claim(c)
+    assert "value_dimensions" in result
+    assert len(result["value_dimensions"]) == 2
+    assert result["value_dimensions"][0]["dimension"] == "inference_cost_avoided"
+    assert result["value_dimensions"][0]["value_usd"] == 47.0
+    assert result["value_dimensions"][1]["value_usd"] > 0
+
+
+def test_claim_with_invalid_dimensions_rejected():
+    c = claim()
+    c["financial_model"]["value_dimensions"] = [
+        {
+            "dimension": "inference_cost_avoided",
+            "inputs": {},
+            "source": "test",
+            "confidence": "medium",
+            "evidence_basis": "observed",
+        },
+    ]
+    errors = validate_claim(c)
+    assert any("value_dimensions[0]" in e for e in errors)
+
+
+def test_portfolio_with_dimensions():
+    c = claim()
+    c["financial_model"]["value_dimensions"] = [
+        {
+            "dimension": "inference_cost_avoided",
+            "inputs": {"observed_cost_difference_usd": 500.0},
+            "source": "replay",
+            "confidence": "high",
+            "evidence_basis": "observed",
+        },
+    ]
+    portfolio = evaluate_portfolio([c])
+    assert portfolio["claims"][0]["value_dimensions"][0]["value_usd"] == 500.0

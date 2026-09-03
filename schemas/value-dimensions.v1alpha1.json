@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/jkershawrh/value-evidence-framework/schemas/value-dimensions.v1alpha1.json",
+  "title": "VEF value dimensions v1alpha1",
+  "description": "Product-agnostic value dimensions for the full business impact claim chain.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["dimension", "inputs", "source", "confidence", "evidence_basis"],
+    "properties": {
+      "dimension": {
+        "enum": [
+          "inference_cost_avoided",
+          "infrastructure_cost_avoided",
+          "human_operational_cost_avoided",
+          "incident_response_value",
+          "downstream_business_impact",
+          "organizational_knowledge_value",
+          "human_cost_of_ownership"
+        ]
+      },
+      "value_usd": {
+        "type": "number",
+        "minimum": 0,
+        "description": "Calculated USD value for this dimension. Present in evaluated output; optional in input (calculated by the framework)."
+      },
+      "inputs": {
+        "type": "object",
+        "description": "Dimension-specific inputs. Schema varies by dimension type.",
+        "oneOf": [
+          { "$ref": "#/$defs/inference_cost_avoided_inputs" },
+          { "$ref": "#/$defs/infrastructure_cost_avoided_inputs" },
+          { "$ref": "#/$defs/human_operational_cost_avoided_inputs" },
+          { "$ref": "#/$defs/incident_response_value_inputs" },
+          { "$ref": "#/$defs/downstream_business_impact_inputs" },
+          { "$ref": "#/$defs/organizational_knowledge_value_inputs" },
+          { "$ref": "#/$defs/human_cost_of_ownership_inputs" }
+        ]
+      },
+      "source": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Where the inputs came from (e.g. pilot_work_log, customer_input, industry_benchmark)."
+      },
+      "confidence": {
+        "enum": ["unverified", "low", "medium", "high"]
+      },
+      "evidence_basis": {
+        "enum": ["observed", "estimated", "industry_benchmark"]
+      }
+    },
+    "additionalProperties": false
+  },
+  "$defs": {
+    "inference_cost_avoided_inputs": {
+      "type": "object",
+      "description": "Model inference calls that did not happen.",
+      "oneOf": [
+        {
+          "required": ["observed_cost_difference_usd"],
+          "properties": {
+            "observed_cost_difference_usd": { "type": "number", "minimum": 0 }
+          }
+        },
+        {
+          "required": ["calls_avoided", "cost_per_call_usd"],
+          "properties": {
+            "calls_avoided": { "type": "number", "minimum": 0 },
+            "cost_per_call_usd": { "type": "number", "minimum": 0 }
+          }
+        }
+      ]
+    },
+    "infrastructure_cost_avoided_inputs": {
+      "type": "object",
+      "description": "Hardware, power, or cloud API costs for inference not needed.",
+      "properties": {
+        "mode": { "enum": ["on_prem", "cloud"], "default": "on_prem" },
+        "units_avoided": { "type": "number", "minimum": 0 },
+        "hardware_cost_per_unit_usd": { "type": "number", "minimum": 0 },
+        "power_watts": { "type": "number", "minimum": 0 },
+        "pue_factor": { "type": "number", "minimum": 1.0 },
+        "cost_per_kwh": { "type": "number", "minimum": 0 },
+        "amortization_years": { "type": "number", "minimum": 1 },
+        "tokens_avoided": { "type": "number", "minimum": 0 },
+        "cloud_cost_per_1k_input_tokens_usd": { "type": "number", "minimum": 0 }
+      }
+    },
+    "human_operational_cost_avoided_inputs": {
+      "type": "object",
+      "description": "Engineer time not spent triaging and investigating signals.",
+      "required": ["signals_not_requiring_human_review"],
+      "properties": {
+        "signals_not_requiring_human_review": { "type": "number", "minimum": 0 },
+        "human_touch_rate": { "type": "number", "minimum": 0, "maximum": 1, "description": "Fraction of suppressed signals that would have actually reached a human without the product (default 0.30). Accounts for existing automation — PagerDuty grouping, silence rules, runbooks." },
+        "avg_triage_minutes_per_signal": { "type": "number", "minimum": 0 },
+        "avg_investigation_minutes_per_signal": { "type": "number", "minimum": 0 },
+        "loaded_hourly_rate_usd": { "type": "number", "minimum": 0 }
+      }
+    },
+    "incident_response_value_inputs": {
+      "type": "object",
+      "description": "Value of faster incident detection and response.",
+      "required": ["incident_count", "improved_mttr_minutes", "cost_per_minute_of_incident_usd"],
+      "properties": {
+        "incident_count": { "type": "number", "minimum": 0 },
+        "baseline_mttr_minutes": { "type": "number", "minimum": 0 },
+        "improved_mttr_minutes": { "type": "number", "minimum": 0 },
+        "cost_per_minute_of_incident_usd": { "type": "number", "minimum": 0 }
+      }
+    },
+    "downstream_business_impact_inputs": {
+      "type": "object",
+      "description": "SLA penalties avoided, user productivity preserved, support tickets prevented.",
+      "properties": {
+        "sla_penalty_per_breach_usd": { "type": "number", "minimum": 0 },
+        "breaches_avoided": { "type": "number", "minimum": 0 },
+        "user_productivity_cost_per_hour_usd": { "type": "number", "minimum": 0 },
+        "hours_preserved": { "type": "number", "minimum": 0 },
+        "support_ticket_cost_usd": { "type": "number", "minimum": 0 },
+        "tickets_avoided": { "type": "number", "minimum": 0 }
+      }
+    },
+    "organizational_knowledge_value_inputs": {
+      "type": "object",
+      "description": "OKV — value of institutional knowledge captured, retained, and made accessible across the organization. Three value paths: decision acceleration, onboarding acceleration, and knowledge retention.",
+      "properties": {
+        "decisions_informed_per_period": { "type": "number", "minimum": 0, "description": "Number of decisions informed by recalled institutional knowledge in the claim period." },
+        "avg_decision_time_saved_minutes": { "type": "number", "minimum": 0, "description": "Average time saved per informed decision vs re-investigating. Default 15 min." },
+        "loaded_hourly_rate_usd": { "type": "number", "minimum": 0, "description": "Blended hourly rate across knowledge consumers. Default $85." },
+        "new_hires_per_year": { "type": "number", "minimum": 0, "description": "Annual new hires in functions served by the knowledge system." },
+        "onboarding_weeks_baseline": { "type": "number", "minimum": 0, "description": "Baseline weeks to full productivity for new hires. Default 12." },
+        "onboarding_weeks_reduction": { "type": "number", "minimum": 0, "description": "Weeks saved by having institutional knowledge available. Default 25% of baseline." },
+        "new_hire_loaded_cost_per_week_usd": { "type": "number", "minimum": 0, "description": "Weekly loaded cost of a new hire during ramp. Default $3,400." },
+        "knowledge_consumers": { "type": "number", "minimum": 0, "description": "Number of people across all functions who benefit from the knowledge system." },
+        "annual_departure_rate": { "type": "number", "minimum": 0, "maximum": 1, "description": "Annual voluntary turnover rate. Default 0.13 (BLS 2024)." },
+        "knowledge_loss_per_departure_usd": { "type": "number", "minimum": 0, "description": "Estimated institutional knowledge cost lost per departing employee. Default $50,000." },
+        "knowledge_retention_factor": { "type": "number", "minimum": 0, "maximum": 1, "description": "Fraction of knowledge loss prevented by the system (0 = none, 1 = all). No default — must be estimated per deployment." },
+        "memories_formed": { "type": "number", "minimum": 0, "description": "Portfolio indicator — total memories formed in the period. Not directly costed." },
+        "causal_links_discovered": { "type": "number", "minimum": 0, "description": "Portfolio indicator — cross-domain causal links discovered. Not directly costed." },
+        "knowledge_domains": { "type": "array", "items": { "type": "string" }, "description": "Which domains feed the knowledge system (e.g. kubernetes, aap, jira, confluence)." }
+      }
+    },
+    "human_cost_of_ownership_inputs": {
+      "type": "object",
+      "description": "HCO — the human price of automation. Reskilling, productivity loss during transition, and attrition risk when work is displaced. This is a cost dimension: it subtracts from gross value.",
+      "required": ["fte_displaced", "annual_loaded_cost_per_fte_usd"],
+      "properties": {
+        "fte_displaced": { "type": "number", "minimum": 0, "description": "Fractional FTE of work displaced by the automation (e.g. 0.1 = 10% of one role)." },
+        "annual_loaded_cost_per_fte_usd": { "type": "number", "minimum": 0, "description": "Fully loaded annual cost per affected FTE (salary + benefits + overhead)." },
+        "current_headcount_in_function": { "type": "number", "minimum": 1, "description": "Current headcount in the affected function. Used to calculate displacement ratio — how much of the team's work is being displaced." },
+        "reskilling_cost_per_fte_usd": { "type": "number", "minimum": 0, "description": "Investment to retrain each displaced FTE. Default $24,800 (SHRM 2024)." },
+        "transition_months": { "type": "number", "minimum": 0, "description": "Duration of the role transition. Default 6 months." },
+        "productivity_loss_during_transition": { "type": "number", "minimum": 0, "maximum": 1, "description": "Fraction of productivity lost during transition. Default 0.20." },
+        "attrition_risk": { "type": "number", "minimum": 0, "maximum": 1, "description": "Probability the displaced person leaves during transition. Default 0.15." },
+        "replacement_cost_factor": { "type": "number", "minimum": 0, "description": "Cost to replace as a multiple of annual salary. Default 0.50." },
+        "amortization_days": { "type": "number", "minimum": 1, "description": "Days over which the transition cost is amortized. Default 365." },
+        "reskilling_pathway": {
+          "type": "array",
+          "description": "Where displaced capacity goes. Each entry maps a current role to a target role with status tracking.",
+          "items": {
+            "type": "object",
+            "required": ["from", "to"],
+            "properties": {
+              "from": { "type": "string", "description": "Current role or function being displaced." },
+              "to": { "type": "string", "description": "Target role or function after reskilling." },
+              "fte": { "type": "number", "minimum": 0, "description": "FTE capacity being redirected in this pathway." },
+              "status": { "enum": ["planned", "in_progress", "completed", "blocked"], "description": "Current state of this reskilling pathway." },
+              "timeline": { "type": "string", "description": "Expected completion (e.g. '2026-Q4')." }
+            }
+          }
+        }
+      }
+    }
+  }
+}
