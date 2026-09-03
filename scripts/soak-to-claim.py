@@ -47,6 +47,96 @@ def safe_get(data: dict, *keys: str, default=None):
     return val if val is not None else default
 
 
+def extract_sc_metrics(cls_end: dict, cls_start: dict) -> dict:
+    """Extract SC hybrid coverage and quality metrics from classifier stats."""
+    cov_end = cls_end.get("coverage") or {}
+    cov_start = cls_start.get("coverage") or {}
+    metrics_end = cls_end.get("metrics") or {}
+
+    sc_authoritative = (cov_end.get("sc_authoritative", 0) or 0) - (
+        cov_start.get("sc_authoritative", 0) or 0
+    )
+    llm_fallback = (cov_end.get("llm_fallback", 0) or 0) - (
+        cov_start.get("llm_fallback", 0) or 0
+    )
+    severity_gated = (cov_end.get("severity_gated", 0) or 0) - (
+        cov_start.get("severity_gated", 0) or 0
+    )
+    margin_gated = (cov_end.get("margin_gated", 0) or 0) - (
+        cov_start.get("margin_gated", 0) or 0
+    )
+    sc_failure = (cov_end.get("sc_failure", 0) or 0) - (
+        cov_start.get("sc_failure", 0) or 0
+    )
+    total_classified = sc_authoritative + llm_fallback + sc_failure
+
+    comparisons = (metrics_end.get("comparisons", 0) or 0) - (
+        (cls_start.get("metrics") or {}).get("comparisons", 0) or 0
+    )
+    agreements = (metrics_end.get("agreements", 0) or 0) - (
+        (cls_start.get("metrics") or {}).get("agreements", 0) or 0
+    )
+    disagreements = (metrics_end.get("disagreements", 0) or 0) - (
+        (cls_start.get("metrics") or {}).get("disagreements", 0) or 0
+    )
+
+    agreement_rate = agreements / comparisons if comparisons > 0 else None
+
+    latency = metrics_end.get("latency_ms") or {}
+    sc_latency_p50 = safe_get(latency, "semantic", "p50")
+    llm_latency_p50 = safe_get(latency, "generative", "p50")
+
+    return {
+        "sc_authoritative": sc_authoritative,
+        "llm_fallback": llm_fallback,
+        "severity_gated": severity_gated,
+        "margin_gated": margin_gated,
+        "sc_failure": sc_failure,
+        "total_classified": total_classified,
+        "sc_coverage_rate": (
+            round(sc_authoritative / total_classified, 4) if total_classified > 0 else None
+        ),
+        "comparisons": comparisons,
+        "agreements": agreements,
+        "disagreements": disagreements,
+        "agreement_rate": round(agreement_rate, 4) if agreement_rate is not None else None,
+        "sc_latency_p50_ms": sc_latency_p50,
+        "llm_latency_p50_ms": llm_latency_p50,
+        "hybrid_margin": cls_end.get("hybrid_margin"),
+        "hybrid_suppress_margin": cls_end.get("hybrid_suppress_margin"),
+        "serializer_revision": cls_end.get("serializer_revision"),
+        "mode": cls_end.get("mode"),
+    }
+
+
+def count_false_suppressions(comparisons_data: dict | list | None) -> dict:
+    """Count dangerous false suppressions from classifier comparison data."""
+    if not comparisons_data:
+        return {"false_suppressions": 0, "total_comparisons": 0, "false_suppression_rate": None}
+
+    records = comparisons_data if isinstance(comparisons_data, list) else (
+        comparisons_data.get("comparisons", []) if isinstance(comparisons_data, dict) else []
+    )
+
+    total = len(records)
+    false_suppressions = 0
+    for r in records:
+        sc_label = r.get("sc_label") or r.get("semantic_label") or ""
+        llm_label = r.get("llm_label") or r.get("generative_label") or ""
+        suppress_labels = {"routine_noise", "known_pattern"}
+        escalate_labels = {"needs_attention", "real_incident"}
+        if sc_label in suppress_labels and llm_label in escalate_labels:
+            false_suppressions += 1
+
+    return {
+        "false_suppressions": false_suppressions,
+        "total_comparisons": total,
+        "false_suppression_rate": (
+            round(false_suppressions / total, 4) if total > 0 else None
+        ),
+    }
+
+
 def build_claim(start: dict, end: dict) -> dict:
     ts_start = start.get("timestamp", "unknown")
     ts_end = end.get("timestamp", "unknown")
@@ -86,9 +176,17 @@ def build_claim(start: dict, end: dict) -> dict:
     active_agents = sum(1 for a in agent_list if a.get("status") == "active")
     total_agents = len(agent_list)
 
-    # Inference cost (if available from classifier stats)
+    # Classifier stats — includes SC hybrid coverage SLI
     cls_end = end.get("classifier_stats") or {}
     cls_start = start.get("classifier_stats") or {}
+
+    # SC hybrid metrics
+    sc_metrics = extract_sc_metrics(cls_end, cls_start)
+
+    # False suppression tracking from comparison records
+    end_comparisons = end.get("classifier_comparisons")
+    start_comparisons = start.get("classifier_comparisons")
+    false_supp = count_false_suppressions(end_comparisons)
 
     calls_avoided = int(cascade_handled) if cascade_handled else 0
     days = hours / 24
@@ -96,8 +194,8 @@ def build_claim(start: dict, end: dict) -> dict:
     # --- Build dimensions with observed data where possible ---
     dimensions = []
 
-    # 1. Inference cost avoided — use observed route data if available,
-    #    otherwise estimate from call counts
+    # 1. Inference cost avoided — SC hybrid means most signals classified
+    #    at ~0 cost (CPU-only SC) instead of expensive LLM calls
     inference_inputs: dict = {}
     baseline_cost = safe_get(cls_end, "baseline_inference_cost_usd")
     cascade_cost = safe_get(cls_end, "cascade_inference_cost_usd")
@@ -109,6 +207,17 @@ def build_claim(start: dict, end: dict) -> dict:
         inference_inputs["calls_avoided"] = calls_avoided
         inference_inputs["cost_per_call_usd"] = 0.10
         inference_basis = "estimated"
+
+    if sc_metrics["sc_authoritative"]:
+        inference_inputs["sc_authoritative_calls"] = sc_metrics["sc_authoritative"]
+        inference_inputs["llm_fallback_calls"] = sc_metrics["llm_fallback"]
+        inference_inputs["sc_cost_per_call_usd"] = 0.0
+        inference_inputs["_sc_note"] = (
+            f"SC handled {sc_metrics['sc_authoritative']:,} signals at ~0 cost "
+            f"(CPU-only, {sc_metrics.get('sc_latency_p50_ms', '?')}ms p50). "
+            f"LLM fallback for {sc_metrics['llm_fallback']:,} signals "
+            f"({sc_metrics.get('llm_latency_p50_ms', '?')}ms p50)."
+        )
 
     dimensions.append({
         "dimension": "inference_cost_avoided",
@@ -259,6 +368,25 @@ def build_claim(start: dict, end: dict) -> dict:
             "evictions": evictions,
             "active_agents": active_agents,
             "total_agents": total_agents,
+            "sc_hybrid": {
+                "mode": sc_metrics["mode"],
+                "sc_authoritative": sc_metrics["sc_authoritative"],
+                "llm_fallback": sc_metrics["llm_fallback"],
+                "severity_gated": sc_metrics["severity_gated"],
+                "margin_gated": sc_metrics["margin_gated"],
+                "sc_failure": sc_metrics["sc_failure"],
+                "sc_coverage_rate": sc_metrics["sc_coverage_rate"],
+                "agreement_rate": sc_metrics["agreement_rate"],
+                "comparisons": sc_metrics["comparisons"],
+                "disagreements": sc_metrics["disagreements"],
+                "false_suppressions": false_supp["false_suppressions"],
+                "false_suppression_rate": false_supp["false_suppression_rate"],
+                "hybrid_margin": sc_metrics["hybrid_margin"],
+                "hybrid_suppress_margin": sc_metrics["hybrid_suppress_margin"],
+                "serializer_revision": sc_metrics["serializer_revision"],
+                "sc_latency_p50_ms": sc_metrics["sc_latency_p50_ms"],
+                "llm_latency_p50_ms": sc_metrics["llm_latency_p50_ms"],
+            },
         },
         "claims": [{
             "id": "cascade.full-business-impact",
@@ -309,10 +437,13 @@ def build_claim(start: dict, end: dict) -> dict:
                     "soak_observation",
                     "cascade_api_snapshots",
                     "shadow_validation",
+                    "sc_hybrid_coverage_sli",
                 ],
                 "reproducible": True,
-                "dangerous_misses": 0,
+                "dangerous_misses": false_supp["false_suppressions"],
                 "shadow_validation_coverage": 1.0,
+                "sc_agreement_rate": sc_metrics["agreement_rate"],
+                "false_suppression_rate": false_supp["false_suppression_rate"],
                 "value_eligible": True,
             },
             "realization_cost": 0,
@@ -341,6 +472,7 @@ def main():
 
     print("", file=sys.stderr)
     meta = claim["_soak_metadata"]
+    sc = meta.get("sc_hybrid") or {}
     print(f"Soak: {meta['duration_hours']}h", file=sys.stderr)
     print(f"Signals: {meta['signals_processed']:,} processed, "
           f"{meta['cascade_handled']:,} handled ({meta['compression_ratio']:.1%} compression)",
@@ -349,6 +481,23 @@ def main():
           f"{meta['memories_retained']:,} retained, "
           f"{meta['evictions']:,} evicted", file=sys.stderr)
     print(f"Agents: {meta['active_agents']} active / {meta['total_agents']} total", file=sys.stderr)
+    if sc.get("mode"):
+        print("", file=sys.stderr)
+        print(f"SC Hybrid: mode={sc['mode']}", file=sys.stderr)
+        sc_auth = sc.get('sc_authoritative', 0)
+        llm_fb = sc.get('llm_fallback', 0)
+        cov = sc.get('sc_coverage_rate')
+        agr = sc.get('agreement_rate')
+        fs = sc.get('false_suppressions', 0)
+        fsr = sc.get('false_suppression_rate')
+        print(f"  SC authoritative: {sc_auth:,}  LLM fallback: {llm_fb:,}  "
+              f"Coverage: {cov:.1%}" if cov else f"  SC: {sc_auth:,}  LLM: {llm_fb:,}",
+              file=sys.stderr)
+        print(f"  Agreement: {agr:.1%}" if agr else "  Agreement: n/a", file=sys.stderr)
+        print(f"  False suppressions: {fs}"
+              + (f" ({fsr:.1%})" if fsr is not None else ""), file=sys.stderr)
+        print(f"  Severity gated: {sc.get('severity_gated', 0)}  "
+              f"Margin gated: {sc.get('margin_gated', 0)}", file=sys.stderr)
     print("", file=sys.stderr)
     print("NOTE: gross_value is set to 'CALCULATE_ME'. Run:", file=sys.stderr)
     print("  vef validate <output-file>", file=sys.stderr)

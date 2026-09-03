@@ -61,8 +61,11 @@ fetch() {
     # Cascade stats (signal counts, compression, AI calls)
     echo "  \"stats\": $(fetch 'cascade stats' "$CASCADE_K8S_URL/stats"),"
 
-    # Classifier stats (comparison metrics)
+    # Classifier stats (comparison metrics + coverage SLI + hybrid margins)
     echo "  \"classifier_stats\": $(fetch 'classifier stats' "$CASCADE_K8S_URL/classifier/stats"),"
+
+    # Classifier comparisons (SC↔LLM disagreement samples for false-suppression tracking)
+    echo "  \"classifier_comparisons\": $(fetch 'classifier comparisons' "$CASCADE_K8S_URL/classifier/comparisons"),"
 
     # Agent status
     echo "  \"agents\": $(fetch 'agents' "$CASCADE_K8S_URL/agents"),"

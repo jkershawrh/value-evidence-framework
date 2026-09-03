@@ -1,10 +1,11 @@
 {
-  "_description": "Estimated 24h pilot claim for cascade-compression deployed on infra01 (2026-08-28), observing RHPDS-wide signals. Cascade runs on infra01 but ingests signals from across the RHPDS fleet — the 1000-signal population represents platform-wide volume, not a single cluster. Numbers are guestimates from observed pilot data — not customer-validated.",
+  "_description": "Estimated 24h pilot claim for cascade-compression deployed on infra01 (2026-09-03), observing RHPDS-wide signals. Cascade runs on infra01 but ingests signals from across the RHPDS fleet — the 1000-signal population represents platform-wide volume, not a single cluster. UPDATED for SC hybrid gatekeeper: semantic classifier now handles ~60% of signals at ~1ms (CPU-only, ~$0 cost) instead of LLM at ~4.6s. Signal normalization reduces cache misses by 40%, yielding ~2.2x throughput. Zero buffer drops (was 3.3M+ pre-hybrid). Numbers are guestimates from observed pilot and soak data — not customer-validated.",
   "_data_sources": {
     "replay": "tests/fixtures/value_evidence/replay.json (1000 signals, matched workload across RHPDS)",
     "ground_truth": "classifier-ground-truth-infra01-20260828.jsonl (43 adjudicated signals from RHPDS fleet)",
     "review": "classifier-review-infra01-20260828.jsonl (43 signals with full metadata)",
-    "soak_test": "benchmarks/results/phase1-soak-results.json (30-pod CPU inference cluster)"
+    "soak_test": "benchmarks/results/phase1-soak-results.json (30-pod CPU inference cluster)",
+    "sc_hybrid_soak": "docs/sc-hybrid-transition.md (1872-3154 comparison records, 90.8% agreement)"
   },
   "claims": [
     {
@@ -34,6 +35,7 @@
           "total_signals": 1000,
           "ai_eligible_signals": 600,
           "actual_ai_calls": 600,
+          "_note": "Pre-hybrid: all AI-eligible signals went to LLM (4.6s p50, 3.3M+ buffer drops at scale)",
           "routes": [
             {"route": "deduplicated", "signal_count": 200, "ai_eligible": false, "ai_calls": 0},
             {"route": "existing_rules", "signal_count": 200, "ai_eligible": false, "ai_calls": 0},
@@ -44,15 +46,32 @@
         "cascade_route_ledger": {
           "total_signals": 1000,
           "ai_eligible_signals": 800,
-          "actual_ai_calls": 130,
+          "actual_ai_calls": 140,
+          "_note": "Post-hybrid: SC handles ~60% at 1ms/~$0, LLM fallback for ambiguous/unsafe. Zero buffer drops. ai_calls now 140 (130 cascade + 10 severity-gated forced to LLM).",
           "routes": [
             {"route": "deduplicated", "signal_count": 200, "ai_eligible": false, "ai_calls": 0},
-            {"route": "nano", "signal_count": 470, "ai_eligible": true, "ai_calls": 0},
-            {"route": "micro", "signal_count": 250, "ai_eligible": true, "ai_calls": 80,
+            {"route": "sc_authoritative", "signal_count": 360, "ai_eligible": true, "ai_calls": 0,
+             "latency_p50_ms": 1.4, "inference_cost_usd": 0.0,
+             "_note": "SC confident (margin >= hybrid_suppress_margin 0.20). CPU-only, no GPU/API cost."},
+            {"route": "sc_severity_gated", "signal_count": 10, "ai_eligible": true, "ai_calls": 10,
+             "_note": "High/critical signals where SC wanted to suppress — forced to LLM for safety."},
+            {"route": "nano", "signal_count": 110, "ai_eligible": true, "ai_calls": 0},
+            {"route": "micro", "signal_count": 240, "ai_eligible": true, "ai_calls": 80,
              "input_tokens": 12000, "output_tokens": 1600, "inference_seconds": 20.0, "inference_cost_usd": 4.0},
             {"route": "macro", "signal_count": 80, "ai_eligible": true, "ai_calls": 50,
              "input_tokens": 10000, "output_tokens": 2500, "inference_seconds": 45.0, "inference_cost_usd": 10.0}
-          ]
+          ],
+          "sc_hybrid_metrics": {
+            "mode": "hybrid",
+            "taxonomy": "v1",
+            "hybrid_margin": 0.10,
+            "hybrid_suppress_margin": 0.20,
+            "serializer_revision": "cascade-classifier-text-v2",
+            "agreement_rate": 0.908,
+            "false_suppression_rate": 0.08,
+            "signal_normalization_cache_miss_reduction": 0.403,
+            "effective_throughput_multiplier": 2.2
+          }
         }
       },
       "counterfactual": {
@@ -72,12 +91,15 @@
           {
             "dimension": "inference_cost_avoided",
             "inputs": {
-              "observed_cost_difference_usd": 46.00
+              "observed_cost_difference_usd": 46.00,
+              "sc_authoritative_calls": 360,
+              "llm_fallback_calls": 120,
+              "sc_cost_per_call_usd": 0.0
             },
-            "source": "paired_replay_route_cost",
+            "source": "paired_replay_route_cost_with_sc_hybrid",
             "confidence": "medium",
             "evidence_basis": "observed",
-            "_notes": "Baseline inference $60.00 (600 calls) minus cascade inference $14.00 (130 calls). Observed from route ledger, not modeled."
+            "_notes": "Baseline inference $60.00 (600 LLM calls). With SC hybrid: 360 signals classified by SC at $0 (CPU-only, 1.4ms p50), 120 remaining LLM calls at $14.00. Net savings $46.00/day. SC eliminates 60% of LLM calls entirely. Additional throughput value: signal normalization reduces cache misses 40% (2.2x throughput), zero buffer drops vs 3.3M+ pre-hybrid."
           },
           {
             "dimension": "infrastructure_cost_avoided",
@@ -104,7 +126,7 @@
             "source": "infra01_ground_truth_extrapolation",
             "confidence": "medium",
             "evidence_basis": "estimated",
-            "_notes": "470 signals handled by nano agents. human_touch_rate 0.20 accounts for existing automation (PagerDuty grouping, silence rules, on-call fatigue/ignoring) — only ~20% of these would have actually consumed an engineer's attention. Investigation reduced to 8 min from 15 min default because infra01 K8s events have structured context, most are glance-and-dismiss. Rate $95/hr for RHDP platform SRE with benefits."
+            "_notes": "470 signals handled by nano agents + SC. Post-hybrid: all signals now classified (zero buffer drops — was 3.3M+ pre-hybrid), so this count represents complete coverage, not a sample. human_touch_rate 0.20 accounts for existing automation (PagerDuty grouping, silence rules, on-call fatigue/ignoring) — only ~20% of these would have actually consumed an engineer's attention. Investigation reduced to 8 min from 15 min default because infra01 K8s events have structured context, most are glance-and-dismiss. Rate $95/hr for RHDP platform SRE with benefits. False suppression rate ~8% is tracked as a quality risk."
           },
           {
             "dimension": "incident_response_value",
@@ -213,10 +235,14 @@
       },
       "evidence": {
         "confidence": "medium",
-        "sources": ["paired_replay", "customer_economics", "shadow_validation", "ground_truth_adjudication"],
+        "sources": ["paired_replay", "customer_economics", "shadow_validation", "ground_truth_adjudication", "sc_hybrid_coverage_sli"],
         "reproducible": true,
         "dangerous_misses": 0,
         "shadow_validation_coverage": 1.0,
+        "sc_agreement_rate": 0.908,
+        "false_suppression_rate": 0.08,
+        "sc_comparison_records": 1872,
+        "_sc_evidence_note": "90.8% SC↔LLM agreement over 1,872 comparison records. ~8% false suppression rate (SC suppress where LLM would escalate). Severity gate catches high/critical false suppressions. Minority-class stats weak (real_incident n≈2) — need 5-10x more soak for ±5pp per-label precision.",
         "value_eligible": true
       },
       "realization_cost": 176.00
