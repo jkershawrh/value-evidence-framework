@@ -42,7 +42,7 @@ echo "=== VEF Soak Collection: $PHASE at $TS ==="
 
 fetch() {
     local label="$1" url="$2"
-    echo "  Fetching $label ..."
+    echo "  Fetching $label ..." >&2
     local result
     if result=$(curl -sf --connect-timeout 10 --max-time 30 "$url" 2>/dev/null); then
         echo "$result"
