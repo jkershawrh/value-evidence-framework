@@ -34,3 +34,4 @@ values-*.local.yaml
 *-deployment.local.yaml
 *.tfstate
 *.tfstate.*
+soak-data/
