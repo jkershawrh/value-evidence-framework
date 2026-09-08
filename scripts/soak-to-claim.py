@@ -17,8 +17,10 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+
+from value_evidence.usage_cost import bounded_usage_delta, estimated_avoided_token_cost_usd
 
 
 def load(path: str) -> dict:
@@ -32,9 +34,19 @@ def delta(start: dict, end: dict, *keys: str) -> float | None:
     for k in keys:
         s = s.get(k) if isinstance(s, dict) else None
         e = e.get(k) if isinstance(e, dict) else None
-    if isinstance(s, (int, float)) and isinstance(e, (int, float)):
+    if (
+        isinstance(s, (int, float))
+        and not isinstance(s, bool)
+        and isinstance(e, (int, float))
+        and not isinstance(e, bool)
+        and e >= s
+    ):
         return e - s
     return None
+
+
+def mapping_delta(start: dict, end: dict, key: str) -> float | None:
+    return delta({"value": start.get(key)}, {"value": end.get(key)}, "value")
 
 
 def safe_get(data: dict, *keys: str, default=None):
@@ -53,34 +65,26 @@ def extract_sc_metrics(cls_end: dict, cls_start: dict) -> dict:
     cov_start = cls_start.get("coverage") or {}
     metrics_end = cls_end.get("metrics") or {}
 
-    sc_authoritative = (cov_end.get("sc_authoritative", 0) or 0) - (
-        cov_start.get("sc_authoritative", 0) or 0
-    )
-    llm_fallback = (cov_end.get("llm_fallback", 0) or 0) - (
-        cov_start.get("llm_fallback", 0) or 0
-    )
-    severity_gated = (cov_end.get("severity_gated", 0) or 0) - (
-        cov_start.get("severity_gated", 0) or 0
-    )
-    margin_gated = (cov_end.get("margin_gated", 0) or 0) - (
-        cov_start.get("margin_gated", 0) or 0
-    )
-    sc_failure = (cov_end.get("sc_failure", 0) or 0) - (
-        cov_start.get("sc_failure", 0) or 0
-    )
-    total_classified = sc_authoritative + llm_fallback + sc_failure
-
-    comparisons = (metrics_end.get("comparisons", 0) or 0) - (
-        (cls_start.get("metrics") or {}).get("comparisons", 0) or 0
-    )
-    agreements = (metrics_end.get("agreements", 0) or 0) - (
-        (cls_start.get("metrics") or {}).get("agreements", 0) or 0
-    )
-    disagreements = (metrics_end.get("disagreements", 0) or 0) - (
-        (cls_start.get("metrics") or {}).get("disagreements", 0) or 0
+    sc_authoritative = mapping_delta(cov_start, cov_end, "sc_authoritative")
+    llm_fallback = mapping_delta(cov_start, cov_end, "llm_fallback")
+    severity_gated = mapping_delta(cov_start, cov_end, "severity_gated")
+    margin_gated = mapping_delta(cov_start, cov_end, "margin_gated")
+    sc_failure = mapping_delta(cov_start, cov_end, "sc_failure")
+    total_classified = (
+        sc_authoritative + llm_fallback + sc_failure
+        if all(value is not None for value in (sc_authoritative, llm_fallback, sc_failure))
+        else None
     )
 
-    agreement_rate = agreements / comparisons if comparisons > 0 else None
+    metrics_start = cls_start.get("metrics") or {}
+    comparisons = mapping_delta(metrics_start, metrics_end, "comparisons")
+    agreements = mapping_delta(metrics_start, metrics_end, "agreements")
+    disagreements = mapping_delta(metrics_start, metrics_end, "disagreements")
+
+    adjudicated = (
+        agreements + disagreements if agreements is not None and disagreements is not None else None
+    )
+    agreement_rate = agreements / adjudicated if adjudicated and adjudicated > 0 else None
 
     latency = metrics_end.get("latency_ms") or {}
     sc_latency_p50 = safe_get(latency, "semantic", "p50")
@@ -94,7 +98,9 @@ def extract_sc_metrics(cls_end: dict, cls_start: dict) -> dict:
         "sc_failure": sc_failure,
         "total_classified": total_classified,
         "sc_coverage_rate": (
-            round(sc_authoritative / total_classified, 4) if total_classified > 0 else None
+            round(sc_authoritative / total_classified, 4)
+            if total_classified and sc_authoritative is not None
+            else None
         ),
         "comparisons": comparisons,
         "agreements": agreements,
@@ -112,10 +118,16 @@ def extract_sc_metrics(cls_end: dict, cls_start: dict) -> dict:
 def count_false_suppressions(comparisons_data: dict | list | None) -> dict:
     """Count dangerous false suppressions from classifier comparison data."""
     if not comparisons_data:
-        return {"false_suppressions": 0, "total_comparisons": 0, "false_suppression_rate": None}
+        return {
+            "false_suppressions": None,
+            "total_comparisons": None,
+            "false_suppression_rate": None,
+        }
 
-    records = comparisons_data if isinstance(comparisons_data, list) else (
-        comparisons_data.get("comparisons", []) if isinstance(comparisons_data, dict) else []
+    records = (
+        comparisons_data
+        if isinstance(comparisons_data, list)
+        else (comparisons_data.get("comparisons", []) if isinstance(comparisons_data, dict) else [])
     )
 
     total = len(records)
@@ -131,44 +143,45 @@ def count_false_suppressions(comparisons_data: dict | list | None) -> dict:
     return {
         "false_suppressions": false_suppressions,
         "total_comparisons": total,
-        "false_suppression_rate": (
-            round(false_suppressions / total, 4) if total > 0 else None
-        ),
+        "false_suppression_rate": (round(false_suppressions / total, 4) if total > 0 else None),
     }
 
 
 def build_claim(start: dict, end: dict) -> dict:
-    ts_start = start.get("timestamp", "unknown")
-    ts_end = end.get("timestamp", "unknown")
+    ts_start = start.get("timestamp") or start.get("captured_at") or "unknown"
+    ts_end = end.get("timestamp") or end.get("captured_at") or "unknown"
 
     try:
-        dt_start = datetime.strptime(ts_start, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
-        dt_end = datetime.strptime(ts_end, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+        if ts_start.endswith("Z") and "-" not in ts_start:
+            dt_start = datetime.strptime(ts_start, "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC)
+            dt_end = datetime.strptime(ts_end, "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC)
+        else:
+            dt_start = datetime.fromisoformat(ts_start)
+            dt_end = datetime.fromisoformat(ts_end)
         hours = (dt_end - dt_start).total_seconds() / 3600
     except (ValueError, TypeError):
-        hours = 72.0
+        hours = None
 
-    signals_processed = delta(start, end, "stats", "signals_processed") or 0
-    cascade_handled = delta(start, end, "stats", "cascade_handled") or 0
-    cascade_forwarded = delta(start, end, "stats", "cascade_forwarded") or 0
+    raw_start_stats = start.get("stats") or {}
+    raw_end_stats = end.get("stats") or {}
+    start_stats = raw_start_stats.get("stats", raw_start_stats)
+    end_stats = raw_end_stats.get("stats", raw_end_stats)
+    signals_processed = mapping_delta(start_stats, end_stats, "signals_processed")
+    cascade_handled = mapping_delta(start_stats, end_stats, "cascade_handled")
+    cascade_forwarded = mapping_delta(start_stats, end_stats, "cascade_forwarded")
 
     compression_ratio = (
-        cascade_handled / signals_processed if signals_processed else 0
+        cascade_handled / signals_processed
+        if signals_processed and cascade_handled is not None
+        else None
     )
-
-    end_stats = end.get("stats") or {}
-    start_stats = start.get("stats") or {}
 
     # Memory deltas
     mem_start = start.get("memory_stats") or {}
     mem_end = end.get("memory_stats") or {}
-    memories_formed = (
-        (mem_end.get("formed_total", 0) or 0) - (mem_start.get("formed_total", 0) or 0)
-    )
-    memories_end_size = mem_end.get("size", 0) or 0
-    evictions = (
-        (mem_end.get("evictions_total", 0) or 0) - (mem_start.get("evictions_total", 0) or 0)
-    )
+    memories_formed = mapping_delta(mem_start, mem_end, "formed_total")
+    memories_end_size = mem_end.get("size")
+    evictions = mapping_delta(mem_start, mem_end, "evictions_total")
 
     # Agent counts
     end_agents = end.get("agents") or {}
@@ -185,184 +198,145 @@ def build_claim(start: dict, end: dict) -> dict:
 
     # False suppression tracking from comparison records
     end_comparisons = end.get("classifier_comparisons")
-    start_comparisons = start.get("classifier_comparisons")
     false_supp = count_false_suppressions(end_comparisons)
 
-    calls_avoided = int(cascade_handled) if cascade_handled else 0
-    days = hours / 24
-
-    # --- Build dimensions with observed data where possible ---
-    dimensions = []
-
-    # 1. Inference cost avoided — SC hybrid means most signals classified
-    #    at ~0 cost (CPU-only SC) instead of expensive LLM calls
-    inference_inputs: dict = {}
-    baseline_cost = safe_get(cls_end, "baseline_inference_cost_usd")
-    cascade_cost = safe_get(cls_end, "cascade_inference_cost_usd")
-    if baseline_cost is not None and cascade_cost is not None:
-        observed_diff = float(baseline_cost) - float(cascade_cost)
-        inference_inputs["observed_cost_difference_usd"] = round(observed_diff, 2)
-        inference_basis = "observed"
-    else:
-        inference_inputs["calls_avoided"] = calls_avoided
-        inference_inputs["cost_per_call_usd"] = 0.10
-        inference_basis = "estimated"
-
-    if sc_metrics["sc_authoritative"]:
-        inference_inputs["sc_authoritative_calls"] = sc_metrics["sc_authoritative"]
-        inference_inputs["llm_fallback_calls"] = sc_metrics["llm_fallback"]
-        inference_inputs["sc_cost_per_call_usd"] = 0.0
-        inference_inputs["_sc_note"] = (
-            f"SC handled {sc_metrics['sc_authoritative']:,} signals at ~0 cost "
-            f"(CPU-only, {sc_metrics.get('sc_latency_p50_ms', '?')}ms p50). "
-            f"LLM fallback for {sc_metrics['llm_fallback']:,} signals "
-            f"({sc_metrics.get('llm_latency_p50_ms', '?')}ms p50)."
+    cost_inputs = end.get("cost_inputs") or {}
+    pricing = cost_inputs.get("pricing") or {}
+    usage_start = {**(start.get("racmaas_usage") or {}), "captured_at": ts_start}
+    usage_end = {**(end.get("racmaas_usage") or {}), "captured_at": ts_end}
+    usage = bounded_usage_delta(usage_start, usage_end)
+    completed = usage["totals"].get("completed_requests")
+    average_input = (
+        usage["totals"]["input_tokens"] / completed
+        if completed and usage["totals"].get("input_tokens") is not None
+        else None
+    )
+    average_output = (
+        usage["totals"]["output_tokens"] / completed
+        if completed and usage["totals"].get("output_tokens") is not None
+        else None
+    )
+    ai_fraction = cost_inputs.get("baseline_ai_eligible_fraction")
+    avoided_cost = estimated_avoided_token_cost_usd(
+        handled_signals=int(cascade_handled) if cascade_handled is not None else None,
+        baseline_ai_eligible_fraction=ai_fraction,
+        average_input_tokens=average_input,
+        average_output_tokens=average_output,
+        pricing=pricing,
+    )
+    dimensions = list(cost_inputs.get("value_dimensions") or [])
+    if avoided_cost is not None:
+        dimensions.insert(
+            0,
+            {
+                "dimension": "inference_cost_avoided",
+                "inputs": {"observed_cost_difference_usd": avoided_cost},
+                "source": pricing["source"],
+                "confidence": (
+                    "medium"
+                    if cost_inputs.get("ai_eligible_fraction_basis") == "observed"
+                    else "low"
+                ),
+                "evidence_basis": (
+                    "observed"
+                    if cost_inputs.get("ai_eligible_fraction_basis") == "observed"
+                    else "estimated"
+                ),
+            },
         )
 
-    dimensions.append({
-        "dimension": "inference_cost_avoided",
-        "inputs": inference_inputs,
-        "source": "soak_route_ledger" if inference_basis == "observed" else "soak_call_count_estimate",
-        "confidence": "medium" if inference_basis == "observed" else "low",
-        "evidence_basis": inference_basis,
-    })
-
-    # 2. Infrastructure cost avoided (keep pilot estimate structure)
-    dimensions.append({
-        "dimension": "infrastructure_cost_avoided",
-        "inputs": {
-            "mode": "on_prem",
-            "units_avoided": round(0.017 * days, 4),
-            "hardware_cost_per_unit_usd": 30000,
-            "power_watts": 1200,
-        },
-        "source": "soak_test_hardware_profiles",
-        "confidence": "low",
-        "evidence_basis": "estimated",
-    })
-
-    # 3. Human operational cost avoided — use observed signal volume
-    dimensions.append({
-        "dimension": "human_operational_cost_avoided",
-        "inputs": {
-            "signals_not_requiring_human_review": calls_avoided,
-            "human_touch_rate": 0.20,
-            "avg_triage_minutes_per_signal": 3.0,
-            "avg_investigation_minutes_per_signal": 8.0,
-            "loaded_hourly_rate_usd": 95.0,
-        },
-        "source": "soak_observed_signal_volume",
-        "confidence": "medium",
-        "evidence_basis": "observed" if signals_processed else "estimated",
-        "_notes": (
-            f"Observed {calls_avoided:,} signals handled by cascade over "
-            f"{hours:.1f}h ({calls_avoided / days:.0f}/day avg). "
-            f"human_touch_rate 0.20 still estimated — needs on-call validation."
-        ),
-    })
-
-    # 4. Incident response — placeholder, needs manual adjudication
-    dimensions.append({
-        "dimension": "incident_response_value",
-        "inputs": {
-            "incident_count": 0,
-            "baseline_mttr_minutes": 45,
-            "improved_mttr_minutes": 15,
-            "cost_per_minute_of_incident_usd": 5.0,
-        },
-        "source": "soak_manual_adjudication_needed",
-        "confidence": "unverified",
-        "evidence_basis": "estimated",
-        "_notes": "Set incident_count from manual review of soak-period incidents.",
-    })
-
-    # 5. Downstream business impact — placeholder
-    dimensions.append({
-        "dimension": "downstream_business_impact",
-        "inputs": {
-            "support_ticket_cost_usd": 35.0,
-            "tickets_avoided": 0,
-            "user_productivity_cost_per_hour_usd": 75.0,
-            "hours_preserved": 0,
-        },
-        "source": "soak_manual_adjudication_needed",
-        "confidence": "unverified",
-        "evidence_basis": "estimated",
-        "_notes": "Populate from support ticket data during soak period.",
-    })
-
-    # 6. OKV — use real memory formation data if available
-    okv_inputs: dict = {
-        "decisions_informed_per_period": 0,
-        "knowledge_consumers": 20,
-        "annual_departure_rate": 0.13,
-        "knowledge_loss_per_departure_usd": 50000,
-        "knowledge_retention_factor": 0.30,
-        "knowledge_domains": ["kubernetes", "aap", "jira", "confluence", "github"],
+    engineering_effort = cost_inputs.get("engineering_effort") or []
+    required_activities = {
+        "ruleset_design",
+        "ruleset_review",
+        "ruleset_testing",
+        "ruleset_deployment",
+        "ruleset_monitoring",
+        "ruleset_maintenance",
     }
-    okv_notes_parts = []
-    if memories_formed > 0:
-        okv_inputs["memories_formed"] = memories_formed
-        okv_notes_parts.append(f"{memories_formed:,} memories formed during soak")
-    if memories_end_size > 0:
-        okv_notes_parts.append(f"{memories_end_size:,} memories in archive at end")
+    valid_effort = required_activities <= {
+        row.get("activity") for row in engineering_effort
+    } and all(
+        isinstance(row.get("hours"), (int, float))
+        and isinstance(row.get("loaded_rate_usd"), (int, float))
+        and row.get("lifecycle") in {"initial", "recurring"}
+        and bool(row.get("role"))
+        and bool(row.get("source"))
+        for row in engineering_effort
+    )
+    initial_cost = (
+        round(
+            sum(
+                row["hours"] * row["loaded_rate_usd"]
+                for row in engineering_effort
+                if row.get("lifecycle") == "initial"
+            ),
+            2,
+        )
+        if valid_effort
+        else None
+    )
+    recurring_cost = (
+        round(
+            sum(
+                row["hours"] * row["loaded_rate_usd"]
+                for row in engineering_effort
+                if row.get("lifecycle") == "recurring"
+            ),
+            2,
+        )
+        if valid_effort
+        else None
+    )
+    other_cost = cost_inputs.get("other_realization_cost_usd")
+    realization_cost = (
+        round(initial_cost + recurring_cost + other_cost, 2)
+        if initial_cost is not None
+        and recurring_cost is not None
+        and isinstance(other_cost, (int, float))
+        else None
+    )
+    dangerous_misses = mapping_delta(start_stats, end_stats, "fn_count")
+    drop_fields = (
+        "llm_dropped",
+        "llm_priority_dropped",
+        "ledger_writes_dropped",
+        "ledger_memory_events_dropped",
+    )
+    drops = {field: mapping_delta(start_stats, end_stats, field) for field in drop_fields}
+    ai_work_complete = usage["usage_complete"] and all(value == 0 for value in drops.values())
+    counterfactual_method = cost_inputs.get("counterfactual_method", "unmeasured")
+    customer_validated = cost_inputs.get("customer_validated") is True
+    value_eligible = (
+        avoided_cost is not None
+        and dangerous_misses == 0
+        and ai_work_complete
+        and counterfactual_method != "unmeasured"
+        and customer_validated
+        and realization_cost is not None
+    )
 
-    dimensions.append({
-        "dimension": "organizational_knowledge_value",
-        "inputs": okv_inputs,
-        "source": "soak_memory_observed" if memories_formed else "soak_estimate",
-        "confidence": "low" if memories_formed else "unverified",
-        "evidence_basis": "observed" if memories_formed else "estimated",
-        "_notes": (
-            ". ".join(okv_notes_parts) + ". " if okv_notes_parts else ""
-        ) + "decisions_informed_per_period needs instrumented recall-to-decision tracking.",
-    })
-
-    # 7. HCO — same structure, adjusted for soak duration
-    dimensions.append({
-        "dimension": "human_cost_of_ownership",
-        "inputs": {
-            "fte_displaced": 0.5,
-            "annual_loaded_cost_per_fte_usd": 165000,
-            "current_headcount_in_function": 6,
-            "reskilling_pathway": [
-                {
-                    "from": "Alert triage / noise filtering",
-                    "to": "Incident analysis and root-cause engineering",
-                    "fte": 0.3,
-                    "status": "planned",
-                    "timeline": "2026-Q4",
-                },
-                {
-                    "from": "Alert triage / noise filtering",
-                    "to": "Cascade rule authoring and validation",
-                    "fte": 0.2,
-                    "status": "in_progress",
-                    "timeline": "2026-Q3",
-                },
-            ],
-        },
-        "source": "soak_operational_estimate",
-        "confidence": "low",
-        "evidence_basis": "estimated",
-    })
-
-    period = f"soak-{hours:.0f}h-{ts_start}-to-{ts_end}"
+    period = (
+        f"soak-{hours:.0f}h-{ts_start}-to-{ts_end}"
+        if hours is not None
+        else f"soak-{ts_start}-to-{ts_end}"
+    )
 
     claim = {
         "_description": (
-            f"Auto-generated VEF claim from {hours:.0f}h soak on cascade-compression "
-            f"(RHPDS via infra01). Signals and memory counts are observed; "
-            f"economic inputs need manual validation."
+            "Auto-generated VEF draft from bounded aggregate observations. "
+            "Repository structure and signal handling are not proof of realized value."
         ),
         "_soak_metadata": {
             "start_snapshot": ts_start,
             "end_snapshot": ts_end,
-            "duration_hours": round(hours, 1),
-            "signals_processed": int(signals_processed),
-            "cascade_handled": int(cascade_handled),
-            "cascade_forwarded": int(cascade_forwarded),
-            "compression_ratio": round(compression_ratio, 4),
+            "duration_hours": round(hours, 1) if hours is not None else None,
+            "signals_processed": int(signals_processed) if signals_processed is not None else None,
+            "cascade_handled": int(cascade_handled) if cascade_handled is not None else None,
+            "cascade_forwarded": int(cascade_forwarded) if cascade_forwarded is not None else None,
+            "compression_ratio": round(compression_ratio, 4)
+            if compression_ratio is not None
+            else None,
             "memories_formed": memories_formed,
             "memories_retained": memories_end_size,
             "evictions": evictions,
@@ -387,67 +361,68 @@ def build_claim(start: dict, end: dict) -> dict:
                 "sc_latency_p50_ms": sc_metrics["sc_latency_p50_ms"],
                 "llm_latency_p50_ms": sc_metrics["llm_latency_p50_ms"],
             },
+            "bounded_ai_usage": usage,
+            "drop_deltas": drops,
         },
-        "claims": [{
-            "id": "cascade.full-business-impact",
-            "product": "cascade-compression",
-            "outcome_id": f"rhpds-via-infra01-soak:{period}",
-            "value_type": "cost_avoidance",
-            "measurement": {
-                "observed": calls_avoided,
-                "unit": "model_calls_avoided",
-                "period": period,
-                "pilot_signal_population": int(signals_processed),
-            },
-            "counterfactual": {
-                "method": "matched_control",
-                "expected_without_product": int(cascade_forwarded + cascade_handled),
-                "matched_workload": True,
-            },
-            "attribution": {
-                "product_share": 1.0,
-                "competing_factors": [
-                    "workload_mix",
-                    "model_routing",
-                    "unit_cost_assumption",
-                    "signal_volume_extrapolation",
-                ],
-            },
-            "financial_model": {
-                "gross_value": "CALCULATE_ME",
-                "currency": "USD",
-                "customer_validated": False,
-                "value_dimensions": dimensions,
-                "engineering_effort": [
-                    {
-                        "activity": "soak_monitoring",
-                        "role": "platform_engineer",
-                        "hours": round(hours * 0.02, 2),
-                        "loaded_rate_usd": 95.0,
-                        "lifecycle": "initial",
-                        "source": "soak_work_log",
-                    },
-                ],
-                "initial_engineering_cost_usd": 0,
-                "recurring_engineering_cost_usd": 0,
-            },
-            "evidence": {
-                "confidence": "medium",
-                "sources": [
-                    "soak_observation",
-                    "cascade_api_snapshots",
-                    "shadow_validation",
-                    "sc_hybrid_coverage_sli",
-                ],
-                "reproducible": True,
-                "dangerous_misses": false_supp["false_suppressions"],
-                "shadow_validation_coverage": 1.0,
-                "sc_agreement_rate": sc_metrics["agreement_rate"],
-                "false_suppression_rate": false_supp["false_suppression_rate"],
-                "value_eligible": True,
-            },
-            "realization_cost": 0,
-        }],
+        "claims": [
+            {
+                "id": "cascade.full-business-impact",
+                "product": "cascade-compression",
+                "outcome_id": f"rhpds-via-infra01-soak:{period}",
+                "value_type": "cost_avoidance"
+                if avoided_cost is not None
+                else "operational_efficiency",
+                "measurement": {
+                    "observed": int(cascade_handled) if cascade_handled is not None else None,
+                    "unit": "signals_handled",
+                    "period": period,
+                    "pilot_signal_population": int(signals_processed)
+                    if signals_processed is not None
+                    else None,
+                    "baseline_ai_eligible_fraction": ai_fraction,
+                },
+                "counterfactual": {
+                    "method": counterfactual_method,
+                    "expected_without_product": cost_inputs.get("expected_without_product"),
+                    "matched_workload": cost_inputs.get("matched_workload") is True,
+                },
+                "attribution": {
+                    "product_share": cost_inputs.get("product_share"),
+                    "competing_factors": [
+                        "workload_mix",
+                        "model_routing",
+                        "pricing_basis",
+                        "baseline_ai_eligibility",
+                    ],
+                },
+                "financial_model": {
+                    "gross_value": avoided_cost if avoided_cost is not None else "UNKNOWN",
+                    "currency": "USD",
+                    "customer_validated": customer_validated,
+                    "value_dimensions": dimensions,
+                    "engineering_effort": engineering_effort,
+                    "initial_engineering_cost_usd": initial_cost,
+                    "recurring_engineering_cost_usd": recurring_cost,
+                },
+                "evidence": {
+                    "confidence": "medium" if value_eligible else "unverified",
+                    "sources": [
+                        "bounded_aggregate_snapshots",
+                        "aggregate_ai_usage_ledger",
+                        "sc_hybrid_coverage_sli",
+                    ],
+                    "reproducible": True,
+                    "dangerous_misses": dangerous_misses,
+                    "dangerous_misses_measured": dangerous_misses is not None,
+                    "ai_work_complete": ai_work_complete,
+                    "shadow_validation_coverage": cost_inputs.get("shadow_validation_coverage"),
+                    "sc_agreement_rate": sc_metrics["agreement_rate"],
+                    "false_suppression_rate": false_supp["false_suppression_rate"],
+                    "value_eligible": value_eligible,
+                },
+                "realization_cost": realization_cost,
+            }
+        ],
     }
 
     return claim
@@ -464,44 +439,70 @@ def main():
     end = load(args.end)
 
     if start.get("phase") != "start":
-        print(f"WARNING: start file phase is '{start.get('phase')}', expected 'start'", file=sys.stderr)
+        print(
+            f"WARNING: start file phase is '{start.get('phase')}', expected 'start'",
+            file=sys.stderr,
+        )
     if end.get("phase") != "end":
         print(f"WARNING: end file phase is '{end.get('phase')}', expected 'end'", file=sys.stderr)
 
     claim = build_claim(start, end)
 
-    print("", file=sys.stderr)
+    print(file=sys.stderr)
     meta = claim["_soak_metadata"]
     sc = meta.get("sc_hybrid") or {}
-    print(f"Soak: {meta['duration_hours']}h", file=sys.stderr)
-    print(f"Signals: {meta['signals_processed']:,} processed, "
-          f"{meta['cascade_handled']:,} handled ({meta['compression_ratio']:.1%} compression)",
-          file=sys.stderr)
-    print(f"Memories: {meta['memories_formed']:,} formed, "
-          f"{meta['memories_retained']:,} retained, "
-          f"{meta['evictions']:,} evicted", file=sys.stderr)
+    print(
+        f"Soak: {meta['duration_hours'] if meta['duration_hours'] is not None else 'unknown'}h",
+        file=sys.stderr,
+    )
+    print(
+        "Signals: "
+        f"{meta['signals_processed'] if meta['signals_processed'] is not None else 'unknown'} "
+        f"processed; compression="
+        f"{meta['compression_ratio'] if meta['compression_ratio'] is not None else 'unknown'}",
+        file=sys.stderr,
+    )
+    print(
+        "Memories: "
+        f"formed={meta['memories_formed'] if meta['memories_formed'] is not None else 'unknown'}, "
+        f"retained={meta['memories_retained'] if meta['memories_retained'] is not None else 'unknown'}, "
+        f"evicted={meta['evictions'] if meta['evictions'] is not None else 'unknown'}",
+        file=sys.stderr,
+    )
     print(f"Agents: {meta['active_agents']} active / {meta['total_agents']} total", file=sys.stderr)
     if sc.get("mode"):
-        print("", file=sys.stderr)
+        print(file=sys.stderr)
         print(f"SC Hybrid: mode={sc['mode']}", file=sys.stderr)
-        sc_auth = sc.get('sc_authoritative', 0)
-        llm_fb = sc.get('llm_fallback', 0)
-        cov = sc.get('sc_coverage_rate')
-        agr = sc.get('agreement_rate')
-        fs = sc.get('false_suppressions', 0)
-        fsr = sc.get('false_suppression_rate')
-        print(f"  SC authoritative: {sc_auth:,}  LLM fallback: {llm_fb:,}  "
-              f"Coverage: {cov:.1%}" if cov else f"  SC: {sc_auth:,}  LLM: {llm_fb:,}",
-              file=sys.stderr)
+        sc_auth = sc.get("sc_authoritative", 0)
+        llm_fb = sc.get("llm_fallback", 0)
+        cov = sc.get("sc_coverage_rate")
+        agr = sc.get("agreement_rate")
+        fs = sc.get("false_suppressions", 0)
+        fsr = sc.get("false_suppression_rate")
+        print(
+            f"  SC authoritative: {sc_auth if sc_auth is not None else 'unknown'}  "
+            f"LLM fallback: {llm_fb if llm_fb is not None else 'unknown'}  "
+            + (f"Coverage: {cov:.1%}" if cov is not None else "Coverage: unknown"),
+            file=sys.stderr,
+        )
         print(f"  Agreement: {agr:.1%}" if agr else "  Agreement: n/a", file=sys.stderr)
-        print(f"  False suppressions: {fs}"
-              + (f" ({fsr:.1%})" if fsr is not None else ""), file=sys.stderr)
-        print(f"  Severity gated: {sc.get('severity_gated', 0)}  "
-              f"Margin gated: {sc.get('margin_gated', 0)}", file=sys.stderr)
-    print("", file=sys.stderr)
-    print("NOTE: gross_value is set to 'CALCULATE_ME'. Run:", file=sys.stderr)
-    print("  vef validate <output-file>", file=sys.stderr)
-    print("to compute it, or manually set it from dimension sum.", file=sys.stderr)
+        print(
+            f"  False suppressions: {fs if fs is not None else 'unknown'}"
+            + (f" ({fsr:.1%})" if fsr is not None else ""),
+            file=sys.stderr,
+        )
+        print(
+            f"  Severity gated: {sc.get('severity_gated', 0)}  "
+            f"Margin gated: {sc.get('margin_gated', 0)}",
+            file=sys.stderr,
+        )
+    print(file=sys.stderr)
+    gross = claim["claims"][0]["financial_model"]["gross_value"]
+    print(f"Financial value: {gross}", file=sys.stderr)
+    if gross == "UNKNOWN":
+        print(
+            "Add bounded usage, named pricing, counterfactual, and effort inputs.", file=sys.stderr
+        )
 
     output = json.dumps(claim, indent=2) + "\n"
     if args.output:

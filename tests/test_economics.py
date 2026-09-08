@@ -13,9 +13,14 @@ def test_flat_input_backward_compat():
         "other_realization_cost_usd": 5.00,
         "customer_validated": True,
         "engineering_effort": [
-            {"activity": "rule_authoring", "role": "platform_engineer",
-             "hours": 0.20, "loaded_rate_usd": 100.0, "lifecycle": "initial",
-             "source": "pilot_work_log"},
+            {
+                "activity": "rule_authoring",
+                "role": "platform_engineer",
+                "hours": 0.20,
+                "loaded_rate_usd": 100.0,
+                "lifecycle": "initial",
+                "source": "pilot_work_log",
+            },
         ],
     }
     assert validate_business_economics(economics) == []
@@ -78,8 +83,14 @@ def test_validates_engineering_effort():
     economics = {
         "model_call_cost_usd": 0.10,
         "engineering_effort": [
-            {"activity": "", "role": "eng", "hours": 1, "loaded_rate_usd": 100,
-             "lifecycle": "initial", "source": "log"},
+            {
+                "activity": "",
+                "role": "eng",
+                "hours": 1,
+                "loaded_rate_usd": 100,
+                "lifecycle": "initial",
+                "source": "log",
+            },
         ],
     }
     errors = validate_business_economics(economics)
@@ -100,10 +111,22 @@ def test_engineering_effort_cost_calculation():
         "model_call_cost_usd": 0.10,
         "other_realization_cost_usd": 5.0,
         "engineering_effort": [
-            {"activity": "rule_authoring", "role": "eng", "hours": 0.2,
-             "loaded_rate_usd": 100, "lifecycle": "initial", "source": "log"},
-            {"activity": "drift_review", "role": "eng", "hours": 0.1,
-             "loaded_rate_usd": 100, "lifecycle": "recurring", "source": "log"},
+            {
+                "activity": "rule_authoring",
+                "role": "eng",
+                "hours": 0.2,
+                "loaded_rate_usd": 100,
+                "lifecycle": "initial",
+                "source": "log",
+            },
+            {
+                "activity": "drift_review",
+                "role": "eng",
+                "hours": 0.1,
+                "loaded_rate_usd": 100,
+                "lifecycle": "recurring",
+                "source": "log",
+            },
         ],
     }
     model, cost = build_financial_model(economics, calls_avoided=100)

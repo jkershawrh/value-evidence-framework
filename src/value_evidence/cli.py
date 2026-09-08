@@ -37,8 +37,11 @@ def main() -> int:
             report = inspect_repository(args.repo, policy=policy)
         except (OSError, TypeError, ValueError) as exc:
             parser.error(str(exc))
-        rendered = (json.dumps(report, indent=2, sort_keys=True) + "\n"
-                    if args.format == "json" else render_inspection_markdown(report))
+        rendered = (
+            json.dumps(report, indent=2, sort_keys=True) + "\n"
+            if args.format == "json"
+            else render_inspection_markdown(report)
+        )
         if args.output:
             Path(args.output).write_text(rendered)
         else:
@@ -51,8 +54,12 @@ def main() -> int:
         print(json.dumps({"valid": not failures, "errors": failures}, indent=2))
         return 1 if failures else 0
     portfolio = evaluate_portfolio(claims)
-    print(json.dumps(portfolio, indent=2) if args.format == "json"
-          else render_markdown(portfolio, args.audience), end="")
+    print(
+        json.dumps(portfolio, indent=2)
+        if args.format == "json"
+        else render_markdown(portfolio, args.audience),
+        end="",
+    )
     return 0
 
 

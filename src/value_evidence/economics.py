@@ -12,10 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 from .dimensions import (
-    VALID_CONFIDENCES,
-    VALID_EVIDENCE_BASES,
     evaluate_dimensions,
-    is_cost_dimension,
     validate_dimensions,
 )
 
@@ -38,10 +35,7 @@ def validate_business_economics(economics: dict[str, Any]) -> list[str]:
     has_flat = "model_call_cost_usd" in economics
 
     if not has_dimensions and not has_flat:
-        errors.append(
-            "economics requires either 'value_dimensions' or "
-            "'model_call_cost_usd'"
-        )
+        errors.append("economics requires either 'value_dimensions' or 'model_call_cost_usd'")
         return errors
 
     if has_dimensions:
@@ -99,12 +93,8 @@ def build_financial_model(
 
     if dimensions:
         evaluated = evaluate_dimensions(dimensions)
-        value_total = sum(
-            d["value_usd"] for d in evaluated if not d.get("is_cost")
-        )
-        cost_total = sum(
-            d["value_usd"] for d in evaluated if d.get("is_cost")
-        )
+        value_total = sum(d["value_usd"] for d in evaluated if not d.get("is_cost"))
+        cost_total = sum(d["value_usd"] for d in evaluated if d.get("is_cost"))
         gross_value = round(max(0.0, value_total - cost_total), 2)
     else:
         cost_per_call = float(economics.get("model_call_cost_usd", 0))
@@ -114,33 +104,35 @@ def build_financial_model(
         else:
             infer_value = round(calls_avoided * cost_per_call, 2)
             cost_basis = "average_call_cost"
-        evaluated = [{
-            "dimension": "inference_cost_avoided",
-            "value_usd": infer_value,
-            "inputs": (
-                {"observed_cost_difference_usd": observed_cost_difference_usd}
-                if observed_cost_difference_usd is not None
-                else {"calls_avoided": calls_avoided, "cost_per_call_usd": cost_per_call}
-            ),
-            "source": economics.get("source", "claim_input"),
-            "confidence": economics.get("confidence", "medium"),
-            "evidence_basis": economics.get("evidence_basis", "estimated"),
-        }]
+        evaluated = [
+            {
+                "dimension": "inference_cost_avoided",
+                "value_usd": infer_value,
+                "inputs": (
+                    {"observed_cost_difference_usd": observed_cost_difference_usd}
+                    if observed_cost_difference_usd is not None
+                    else {"calls_avoided": calls_avoided, "cost_per_call_usd": cost_per_call}
+                ),
+                "source": economics.get("source", "claim_input"),
+                "confidence": economics.get("confidence", "medium"),
+                "evidence_basis": economics.get("evidence_basis", "estimated"),
+            }
+        ]
         gross_value = infer_value
 
     efforts = economics.get("engineering_effort", [])
     effort_rows = [
-        {**effort, "cost_usd": round(
-            float(effort.get("hours", 0)) * float(effort.get("loaded_rate_usd", 0)), 2,
-        )}
+        {
+            **effort,
+            "cost_usd": round(
+                float(effort.get("hours", 0)) * float(effort.get("loaded_rate_usd", 0)),
+                2,
+            ),
+        }
         for effort in efforts
     ]
-    initial_cost = sum(
-        r["cost_usd"] for r in effort_rows if r.get("lifecycle") == "initial"
-    )
-    recurring_cost = sum(
-        r["cost_usd"] for r in effort_rows if r.get("lifecycle") == "recurring"
-    )
+    initial_cost = sum(r["cost_usd"] for r in effort_rows if r.get("lifecycle") == "initial")
+    recurring_cost = sum(r["cost_usd"] for r in effort_rows if r.get("lifecycle") == "recurring")
     other_cost = float(economics.get("other_realization_cost_usd", 0))
     realization_cost = round(other_cost + initial_cost + recurring_cost, 2)
 

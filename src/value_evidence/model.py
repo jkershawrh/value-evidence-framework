@@ -8,15 +8,35 @@ from typing import Any
 
 from .dimensions import evaluate_dimensions, validate_dimensions
 
-CONFIDENCE_FACTORS = {"unverified": Decimal(0), "low": Decimal("0.25"),
-                      "medium": Decimal("0.60"), "high": Decimal("0.85")}
-METHOD_STRENGTH = {"assertion": 0, "expert_estimate": 1, "modeled_baseline": 2,
-                   "historical_baseline": 3, "interrupted_time_series": 4,
-                   "difference_in_differences": 5, "matched_control": 6,
-                   "randomized_or_phased": 7}
+CONFIDENCE_FACTORS = {
+    "unverified": Decimal(0),
+    "low": Decimal("0.25"),
+    "medium": Decimal("0.60"),
+    "high": Decimal("0.85"),
+}
+METHOD_STRENGTH = {
+    "assertion": 0,
+    "expert_estimate": 1,
+    "modeled_baseline": 2,
+    "historical_baseline": 3,
+    "interrupted_time_series": 4,
+    "difference_in_differences": 5,
+    "matched_control": 6,
+    "randomized_or_phased": 7,
+}
 
-REQUIRED = ("id", "product", "outcome_id", "value_type", "measurement",
-            "counterfactual", "attribution", "financial_model", "evidence", "realization_cost")
+REQUIRED = (
+    "id",
+    "product",
+    "outcome_id",
+    "value_type",
+    "measurement",
+    "counterfactual",
+    "attribution",
+    "financial_model",
+    "evidence",
+    "realization_cost",
+)
 
 
 def validate_claim(claim: dict[str, Any]) -> list[str]:
@@ -48,8 +68,13 @@ def validate_claim(claim: dict[str, Any]) -> list[str]:
         prefix = f"financial_model.engineering_effort[{index}]"
         if effort.get("lifecycle") not in {"initial", "recurring"}:
             errors.append(f"{prefix}.lifecycle must be initial or recurring")
-        if min(Decimal(str(effort.get("hours", -1))),
-               Decimal(str(effort.get("loaded_rate_usd", -1)))) < 0:
+        if (
+            min(
+                Decimal(str(effort.get("hours", -1))),
+                Decimal(str(effort.get("loaded_rate_usd", -1))),
+            )
+            < 0
+        ):
             errors.append(f"{prefix} hours and rate must be non-negative")
     dims = claim["financial_model"].get("value_dimensions")
     if dims is not None:
@@ -89,7 +114,11 @@ def _rating(claim: dict[str, Any]) -> tuple[str, list[str]]:
         gaps.append("calculation is not independently reproducible")
     if not claim["attribution"].get("competing_factors"):
         gaps.append("competing explanations are not recorded")
-    if not gaps and METHOD_STRENGTH[method] >= METHOD_STRENGTH["matched_control"] and confidence == "high":
+    if (
+        not gaps
+        and METHOD_STRENGTH[method] >= METHOD_STRENGTH["matched_control"]
+        and confidence == "high"
+    ):
         return "green", gaps
     if len(gaps) <= 2 and confidence != "unverified":
         return "amber", gaps
@@ -115,21 +144,24 @@ def evaluate_claim(claim: dict[str, Any]) -> dict[str, Any]:
     dims_evaluated = evaluate_dimensions(dims_raw) if dims_raw else None
 
     result: dict[str, Any] = {
-        "id": claim["id"], "product": claim["product"], "outcome_id": claim["outcome_id"],
+        "id": claim["id"],
+        "product": claim["product"],
+        "outcome_id": claim["outcome_id"],
         "currency": claim["financial_model"].get("currency", "USD"),
-        "gross_value": float(gross), "attributable_value": float(attributable),
-        "confidence_adjusted_value": float(adjusted), "realization_cost": float(cost),
+        "gross_value": float(gross),
+        "attributable_value": float(attributable),
+        "confidence_adjusted_value": float(adjusted),
+        "realization_cost": float(cost),
         "net_value": float(adjusted - cost),
         "value_leverage": float(adjusted / cost) if cost else None,
-        "rating": rating, "gaps": gaps,
+        "rating": rating,
+        "gaps": gaps,
         "ai_usage": {
             "baseline_eligible_signals": baseline.get("ai_eligible_signals"),
             "baseline_ai_calls": baseline.get("actual_ai_calls"),
             "cascade_eligible_signals": cascade.get("ai_eligible_signals"),
             "cascade_ai_calls": cascade.get("actual_ai_calls"),
-            "avoided_inference_cost": claim["measurement"].get(
-                "raw_inference_cost_avoided_usd"
-            ),
+            "avoided_inference_cost": claim["measurement"].get("raw_inference_cost_avoided_usd"),
         },
         "engineering_cost": {
             "initial": financial.get("initial_engineering_cost_usd", 0),
@@ -156,7 +188,12 @@ def evaluate_portfolio(claims: list[dict[str, Any]]) -> dict[str, Any]:
         "claims": results,
         "totals": {
             key: sum(item[key] for item in results)
-            for key in ("gross_value", "attributable_value", "confidence_adjusted_value",
-                        "realization_cost", "net_value")
+            for key in (
+                "gross_value",
+                "attributable_value",
+                "confidence_adjusted_value",
+                "realization_cost",
+                "net_value",
+            )
         },
     }

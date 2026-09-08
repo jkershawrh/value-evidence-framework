@@ -23,4 +23,3 @@ __all__ = [
     "validate_dimension",
     "validate_dimensions",
 ]
-

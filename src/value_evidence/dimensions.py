@@ -18,18 +18,19 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
-
 VALID_EVIDENCE_BASES = {"observed", "estimated", "industry_benchmark"}
 VALID_CONFIDENCES = {"unverified", "low", "medium", "high"}
-VALID_DIMENSION_TYPES = frozenset({
-    "inference_cost_avoided",
-    "infrastructure_cost_avoided",
-    "human_operational_cost_avoided",
-    "incident_response_value",
-    "downstream_business_impact",
-    "human_cost_of_ownership",
-    "organizational_knowledge_value",
-})
+VALID_DIMENSION_TYPES = frozenset(
+    {
+        "inference_cost_avoided",
+        "infrastructure_cost_avoided",
+        "human_operational_cost_avoided",
+        "incident_response_value",
+        "downstream_business_impact",
+        "human_cost_of_ownership",
+        "organizational_knowledge_value",
+    }
+)
 
 DIMENSION_DEFAULTS: dict[str, dict[str, Any]] = {
     "infrastructure_cost_avoided": {
@@ -53,8 +54,8 @@ DIMENSION_DEFAULTS: dict[str, dict[str, Any]] = {
         "human_touch_rate": {
             "value": 0.30,
             "source": "fraction of alerts that reach a human after existing "
-                      "automation (PagerDuty grouping, silence rules, runbooks); "
-                      "PagerDuty 2024 reports ~70% of alerts are noise/auto-resolved",
+            "automation (PagerDuty grouping, silence rules, runbooks); "
+            "PagerDuty 2024 reports ~70% of alerts are noise/auto-resolved",
         },
     },
     "incident_response_value": {
@@ -67,22 +68,21 @@ DIMENSION_DEFAULTS: dict[str, dict[str, Any]] = {
         "avg_decision_time_saved_minutes": {
             "value": 15.0,
             "source": "McKinsey knowledge worker productivity — avg time to find "
-                      "relevant institutional context for a decision",
+            "relevant institutional context for a decision",
         },
         "onboarding_weeks_baseline": {
             "value": 12.0,
-            "source": "SHRM 2024 — median time to full productivity for "
-                      "technical roles",
+            "source": "SHRM 2024 — median time to full productivity for technical roles",
         },
         "knowledge_loss_per_departure_usd": {
             "value": 50000.0,
             "source": "Deloitte human capital — estimated cost of institutional "
-                      "knowledge loss per departing technical employee",
+            "knowledge loss per departing technical employee",
         },
         "annual_departure_rate": {
             "value": 0.13,
             "source": "Bureau of Labor Statistics 2024 — professional/technical "
-                      "voluntary turnover rate",
+            "voluntary turnover rate",
         },
     },
     "human_cost_of_ownership": {
@@ -97,7 +97,7 @@ DIMENSION_DEFAULTS: dict[str, dict[str, Any]] = {
         "productivity_loss_during_transition": {
             "value": 0.20,
             "source": "Gallup workplace disruption research — 20% productivity dip "
-                      "during role transition",
+            "during role transition",
         },
         "attrition_risk": {
             "value": 0.15,
@@ -106,7 +106,7 @@ DIMENSION_DEFAULTS: dict[str, dict[str, Any]] = {
         "replacement_cost_factor": {
             "value": 0.50,
             "source": "SHRM 2024 — average cost-to-replace at 50% of annual salary "
-                      "for technical roles",
+            "for technical roles",
         },
         "amortization_days": {
             "value": 365,
@@ -143,13 +143,11 @@ class ValueDimension(ABC):
 
     @staticmethod
     @abstractmethod
-    def validate_inputs(inputs: dict[str, Any]) -> list[str]:
-        ...
+    def validate_inputs(inputs: dict[str, Any]) -> list[str]: ...
 
     @staticmethod
     @abstractmethod
-    def calculate(inputs: dict[str, Any]) -> float:
-        ...
+    def calculate(inputs: dict[str, Any]) -> float: ...
 
 
 def _require_positive(inputs: dict, key: str, errors: list[str]) -> None:
@@ -180,8 +178,7 @@ class InferenceCostAvoided(ValueDimension):
         if "observed_cost_difference_usd" in inputs:
             return round(float(inputs["observed_cost_difference_usd"]), 2)
         return round(
-            float(inputs.get("calls_avoided", 0))
-            * float(inputs.get("cost_per_call_usd", 0)),
+            float(inputs.get("calls_avoided", 0)) * float(inputs.get("cost_per_call_usd", 0)),
             2,
         )
 
@@ -221,9 +218,12 @@ class InfrastructureCostAvoided(ValueDimension):
         power_w = float(inputs.get("power_watts", 0))
         pue = float(inputs.get("pue_factor", defaults["pue_factor"]["value"]))
         kwh_cost = float(inputs.get("cost_per_kwh", defaults["cost_per_kwh"]["value"]))
-        years = float(inputs.get(
-            "amortization_years", defaults["amortization_years"]["value"],
-        ))
+        years = float(
+            inputs.get(
+                "amortization_years",
+                defaults["amortization_years"]["value"],
+            )
+        )
 
         capex = units * hw_cost
         annual_power = units * power_w * 8760 * kwh_cost * pue / 1000
@@ -247,22 +247,30 @@ class HumanOperationalCostAvoided(ValueDimension):
     def calculate(inputs: dict[str, Any]) -> float:
         defaults = DIMENSION_DEFAULTS["human_operational_cost_avoided"]
         signals = float(inputs.get("signals_not_requiring_human_review", 0))
-        touch_rate = float(inputs.get(
-            "human_touch_rate",
-            defaults["human_touch_rate"]["value"],
-        ))
-        triage_min = float(inputs.get(
-            "avg_triage_minutes_per_signal",
-            defaults["avg_triage_minutes_per_signal"]["value"],
-        ))
-        investigation_min = float(inputs.get(
-            "avg_investigation_minutes_per_signal",
-            defaults["avg_investigation_minutes_per_signal"]["value"],
-        ))
-        rate = float(inputs.get(
-            "loaded_hourly_rate_usd",
-            defaults["loaded_hourly_rate_usd"]["value"],
-        ))
+        touch_rate = float(
+            inputs.get(
+                "human_touch_rate",
+                defaults["human_touch_rate"]["value"],
+            )
+        )
+        triage_min = float(
+            inputs.get(
+                "avg_triage_minutes_per_signal",
+                defaults["avg_triage_minutes_per_signal"]["value"],
+            )
+        )
+        investigation_min = float(
+            inputs.get(
+                "avg_investigation_minutes_per_signal",
+                defaults["avg_investigation_minutes_per_signal"]["value"],
+            )
+        )
+        rate = float(
+            inputs.get(
+                "loaded_hourly_rate_usd",
+                defaults["loaded_hourly_rate_usd"]["value"],
+            )
+        )
         effective_signals = signals * min(max(touch_rate, 0.0), 1.0)
         total_minutes = effective_signals * (triage_min + investigation_min)
         return round(total_minutes * rate / 60, 2)
@@ -281,18 +289,23 @@ class IncidentResponseValue(ValueDimension):
         _require_positive(inputs, "cost_per_minute_of_incident_usd", errors)
         baseline = inputs.get("baseline_mttr_minutes")
         improved = inputs.get("improved_mttr_minutes")
-        if (isinstance(baseline, (int, float)) and isinstance(improved, (int, float))
-                and improved > baseline):
+        if (
+            isinstance(baseline, (int, float))
+            and isinstance(improved, (int, float))
+            and improved > baseline
+        ):
             errors.append("improved_mttr_minutes must be <= baseline_mttr_minutes")
         return errors
 
     @staticmethod
     def calculate(inputs: dict[str, Any]) -> float:
         defaults = DIMENSION_DEFAULTS["incident_response_value"]
-        baseline = float(inputs.get(
-            "baseline_mttr_minutes",
-            defaults["baseline_mttr_minutes"]["value"],
-        ))
+        baseline = float(
+            inputs.get(
+                "baseline_mttr_minutes",
+                defaults["baseline_mttr_minutes"]["value"],
+            )
+        )
         improved = float(inputs.get("improved_mttr_minutes", 0))
         count = float(inputs.get("incident_count", 0))
         cost_per_min = float(inputs.get("cost_per_minute_of_incident_usd", 0))
@@ -329,17 +342,14 @@ class DownstreamBusinessImpact(ValueDimension):
     @staticmethod
     def calculate(inputs: dict[str, Any]) -> float:
         total = 0.0
-        total += (
-            float(inputs.get("sla_penalty_per_breach_usd", 0))
-            * float(inputs.get("breaches_avoided", 0))
+        total += float(inputs.get("sla_penalty_per_breach_usd", 0)) * float(
+            inputs.get("breaches_avoided", 0)
         )
-        total += (
-            float(inputs.get("user_productivity_cost_per_hour_usd", 0))
-            * float(inputs.get("hours_preserved", 0))
+        total += float(inputs.get("user_productivity_cost_per_hour_usd", 0)) * float(
+            inputs.get("hours_preserved", 0)
         )
-        total += (
-            float(inputs.get("support_ticket_cost_usd", 0))
-            * float(inputs.get("tickets_avoided", 0))
+        total += float(inputs.get("support_ticket_cost_usd", 0)) * float(
+            inputs.get("tickets_avoided", 0)
         )
         return round(total, 2)
 
@@ -395,9 +405,7 @@ class OrganizationalKnowledgeValue(ValueDimension):
                 _require_positive(inputs, optional, errors)
         kr = inputs.get("knowledge_retention_factor")
         if kr is not None and (not isinstance(kr, (int, float)) or not 0 <= kr <= 1):
-            errors.append(
-                "inputs.knowledge_retention_factor must be between 0 and 1"
-            )
+            errors.append("inputs.knowledge_retention_factor must be between 0 and 1")
         return errors
 
     @staticmethod
@@ -407,33 +415,41 @@ class OrganizationalKnowledgeValue(ValueDimension):
 
         decisions = float(inputs.get("decisions_informed_per_period", 0))
         if decisions:
-            time_saved = float(inputs.get(
-                "avg_decision_time_saved_minutes",
-                defaults["avg_decision_time_saved_minutes"]["value"],
-            ))
+            time_saved = float(
+                inputs.get(
+                    "avg_decision_time_saved_minutes",
+                    defaults["avg_decision_time_saved_minutes"]["value"],
+                )
+            )
             rate = float(inputs.get("loaded_hourly_rate_usd", 85.0))
             total += decisions * time_saved * rate / 60
 
         new_hires = float(inputs.get("new_hires_per_year", 0))
         if new_hires:
-            baseline_weeks = float(inputs.get(
-                "onboarding_weeks_baseline",
-                defaults["onboarding_weeks_baseline"]["value"],
-            ))
+            baseline_weeks = float(
+                inputs.get(
+                    "onboarding_weeks_baseline",
+                    defaults["onboarding_weeks_baseline"]["value"],
+                )
+            )
             reduction = float(inputs.get("onboarding_weeks_reduction", baseline_weeks * 0.25))
             weekly_cost = float(inputs.get("new_hire_loaded_cost_per_week_usd", 85.0 * 40))
             total += new_hires * reduction * weekly_cost / 365
 
         consumers = float(inputs.get("knowledge_consumers", 0))
         if consumers:
-            departure_rate = float(inputs.get(
-                "annual_departure_rate",
-                defaults["annual_departure_rate"]["value"],
-            ))
-            loss_per_departure = float(inputs.get(
-                "knowledge_loss_per_departure_usd",
-                defaults["knowledge_loss_per_departure_usd"]["value"],
-            ))
+            departure_rate = float(
+                inputs.get(
+                    "annual_departure_rate",
+                    defaults["annual_departure_rate"]["value"],
+                )
+            )
+            loss_per_departure = float(
+                inputs.get(
+                    "knowledge_loss_per_departure_usd",
+                    defaults["knowledge_loss_per_departure_usd"]["value"],
+                )
+            )
             retention = float(inputs.get("knowledge_retention_factor", 0.50))
             departures_per_day = consumers * departure_rate / 365
             total += departures_per_day * loss_per_departure * retention
@@ -465,19 +481,18 @@ class HumanCostOfOwnership(ValueDimension):
             if not isinstance(headcount, (int, float)) or headcount < 1:
                 errors.append("inputs.current_headcount_in_function must be >= 1")
             fte = inputs.get("fte_displaced")
-            if (isinstance(fte, (int, float)) and isinstance(headcount, (int, float))
-                    and fte > headcount):
-                errors.append(
-                    "inputs.fte_displaced cannot exceed current_headcount_in_function"
-                )
+            if (
+                isinstance(fte, (int, float))
+                and isinstance(headcount, (int, float))
+                and fte > headcount
+            ):
+                errors.append("inputs.fte_displaced cannot exceed current_headcount_in_function")
         tr = inputs.get("attrition_risk")
         if tr is not None and (not isinstance(tr, (int, float)) or not 0 <= tr <= 1):
             errors.append("inputs.attrition_risk must be between 0 and 1")
         pl = inputs.get("productivity_loss_during_transition")
         if pl is not None and (not isinstance(pl, (int, float)) or not 0 <= pl <= 1):
-            errors.append(
-                "inputs.productivity_loss_during_transition must be between 0 and 1"
-            )
+            errors.append("inputs.productivity_loss_during_transition must be between 0 and 1")
         pathway = inputs.get("reskilling_pathway")
         if pathway is not None and not isinstance(pathway, list):
             errors.append("inputs.reskilling_pathway must be a list of pathway entries")
@@ -488,35 +503,45 @@ class HumanCostOfOwnership(ValueDimension):
         defaults = DIMENSION_DEFAULTS["human_cost_of_ownership"]
         fte = float(inputs.get("fte_displaced", 0))
         annual_cost = float(inputs.get("annual_loaded_cost_per_fte_usd", 0))
-        reskill = float(inputs.get(
-            "reskilling_cost_per_fte_usd",
-            defaults["reskilling_cost_per_fte_usd"]["value"],
-        ))
-        months = float(inputs.get(
-            "transition_months",
-            defaults["transition_months"]["value"],
-        ))
-        prod_loss = float(inputs.get(
-            "productivity_loss_during_transition",
-            defaults["productivity_loss_during_transition"]["value"],
-        ))
-        attrition = float(inputs.get(
-            "attrition_risk",
-            defaults["attrition_risk"]["value"],
-        ))
-        replace_factor = float(inputs.get(
-            "replacement_cost_factor",
-            defaults["replacement_cost_factor"]["value"],
-        ))
-        amort_days = float(inputs.get(
-            "amortization_days",
-            defaults["amortization_days"]["value"],
-        ))
+        reskill = float(
+            inputs.get(
+                "reskilling_cost_per_fte_usd",
+                defaults["reskilling_cost_per_fte_usd"]["value"],
+            )
+        )
+        months = float(
+            inputs.get(
+                "transition_months",
+                defaults["transition_months"]["value"],
+            )
+        )
+        prod_loss = float(
+            inputs.get(
+                "productivity_loss_during_transition",
+                defaults["productivity_loss_during_transition"]["value"],
+            )
+        )
+        attrition = float(
+            inputs.get(
+                "attrition_risk",
+                defaults["attrition_risk"]["value"],
+            )
+        )
+        replace_factor = float(
+            inputs.get(
+                "replacement_cost_factor",
+                defaults["replacement_cost_factor"]["value"],
+            )
+        )
+        amort_days = float(
+            inputs.get(
+                "amortization_days",
+                defaults["amortization_days"]["value"],
+            )
+        )
 
         reskilling_total = fte * reskill
-        productivity_loss_total = (
-            fte * (annual_cost / 12) * months * prod_loss
-        )
+        productivity_loss_total = fte * (annual_cost / 12) * months * prod_loss
         attrition_total = fte * attrition * annual_cost * replace_factor
 
         total_transition = reskilling_total + productivity_loss_total + attrition_total

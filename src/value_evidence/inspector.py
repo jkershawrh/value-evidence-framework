@@ -11,8 +11,16 @@ from typing import Any
 
 SCHEMA_VERSION = "vef.readiness.v1alpha1"
 MAX_FILE_BYTES = 1_000_000
-GENERATED_PARTS = {".git", ".venv", "venv", "node_modules", "dist", "build",
-                   "local-evidence", "__pycache__"}
+GENERATED_PARTS = {
+    ".git",
+    ".venv",
+    "venv",
+    "node_modules",
+    "dist",
+    "build",
+    "local-evidence",
+    "__pycache__",
+}
 
 
 @dataclass(frozen=True)
@@ -27,43 +35,101 @@ class Rule:
 
 
 RULES = (
-    Rule("BDD-001", "BDD", 10, ("outcome_id", "period", "total_signals"),
-         "Define a bounded, customer-observable outcome and measured population.",
-         "No executable contract binds the outcome, period, and population."),
-    Rule("EDD-001", "EDD", 10, ("timestamp", "source", "unknown"),
-         "Capture timestamped provenance and preserve unknown measurements.",
-         "Evidence records cannot distinguish observed, missing, and asserted values."),
-    Rule("EDD-002", "EDD", 10, ("false_negative", "dropped", "reproducible"),
-         "Record quality failures, dropped work, and reproducibility metadata.",
-         "Safety or collection failures are absent from validated evidence."),
-    Rule("CDD-001", "CDD", 10, ("schema_version", "validate", "value_evidence"),
-         "Add a versioned, validated VEF export contract.",
-         "The exporter and its compatibility contract are not tested together.", True),
-    Rule("CBT-001", "CBT", 10, ("baseline", "workload_digest", "total_signals"),
-         "Add an independently observed baseline matched to the measured population.",
-         "Baseline and treatment populations cannot be reconciled.", True),
-    Rule("CBT-002", "CBT", 10, ("counterfactual", "competing_factors", "method"),
-         "Record the comparison method and competing explanations.",
-         "The no-product world or alternative explanations are not represented."),
-    Rule("SAFE-001", "Safety", 10,
-         ("product_share", "dangerous_misses", "value_eligible"),
-         "Fail financial claims closed on safety failures and constrain attribution.",
-         "Unsafe outcomes or shared value can still produce an uncapped claim.", True),
-    Rule("ECON-001", "Economics", 10,
-         ("actual_ai_calls", "input_tokens", "inference_cost_usd"),
-         "Measure actual AI participation, tokens, and inference cost.",
-         "Compression is used without measured AI consumption."),
-    Rule("ECON-002", "Economics", 10,
-         ("engineering_effort", "recurring", "loaded_rate_usd"),
-         "Capture initial and recurring ruleset/engineering effort at loaded rates.",
-         "Realization cost omits bounded engineering effort."),
-    Rule("TDD-001", "TDD", 10, ("negative", "replay", "deterministic"),
-         "Test negative value, deterministic replay, and reproducible reporting.",
-         "The calculation can only demonstrate favorable or non-reproducible results.", True),
+    Rule(
+        "BDD-001",
+        "BDD",
+        10,
+        ("outcome_id", "period", "total_signals"),
+        "Define a bounded, customer-observable outcome and measured population.",
+        "No executable contract binds the outcome, period, and population.",
+    ),
+    Rule(
+        "EDD-001",
+        "EDD",
+        10,
+        ("timestamp", "source", "unknown"),
+        "Capture timestamped provenance and preserve unknown measurements.",
+        "Evidence records cannot distinguish observed, missing, and asserted values.",
+    ),
+    Rule(
+        "EDD-002",
+        "EDD",
+        10,
+        ("false_negative", "dropped", "reproducible"),
+        "Record quality failures, dropped work, and reproducibility metadata.",
+        "Safety or collection failures are absent from validated evidence.",
+    ),
+    Rule(
+        "CDD-001",
+        "CDD",
+        10,
+        ("schema_version", "validate", "value_evidence"),
+        "Add a versioned, validated VEF export contract.",
+        "The exporter and its compatibility contract are not tested together.",
+        True,
+    ),
+    Rule(
+        "CBT-001",
+        "CBT",
+        10,
+        ("baseline", "workload_digest", "total_signals"),
+        "Add an independently observed baseline matched to the measured population.",
+        "Baseline and treatment populations cannot be reconciled.",
+        True,
+    ),
+    Rule(
+        "CBT-002",
+        "CBT",
+        10,
+        ("counterfactual", "competing_factors", "method"),
+        "Record the comparison method and competing explanations.",
+        "The no-product world or alternative explanations are not represented.",
+    ),
+    Rule(
+        "SAFE-001",
+        "Safety",
+        10,
+        ("product_share", "dangerous_misses", "value_eligible"),
+        "Fail financial claims closed on safety failures and constrain attribution.",
+        "Unsafe outcomes or shared value can still produce an uncapped claim.",
+        True,
+    ),
+    Rule(
+        "ECON-001",
+        "Economics",
+        10,
+        ("actual_ai_calls", "input_tokens", "inference_cost_usd"),
+        "Measure actual AI participation, tokens, and inference cost.",
+        "Compression is used without measured AI consumption.",
+    ),
+    Rule(
+        "ECON-002",
+        "Economics",
+        10,
+        ("engineering_effort", "recurring", "loaded_rate_usd"),
+        "Capture initial and recurring ruleset/engineering effort at loaded rates.",
+        "Realization cost omits bounded engineering effort.",
+    ),
+    Rule(
+        "TDD-001",
+        "TDD",
+        10,
+        ("negative", "replay", "deterministic"),
+        "Test negative value, deterministic replay, and reproducible reporting.",
+        "The calculation can only demonstrate favorable or non-reproducible results.",
+        True,
+    ),
 )
 
-CATEGORY_MAX = {"BDD": 10, "EDD": 20, "CDD": 10, "CBT": 20,
-                "Safety": 10, "Economics": 20, "TDD": 10}
+CATEGORY_MAX = {
+    "BDD": 10,
+    "EDD": 20,
+    "CDD": 10,
+    "CBT": 20,
+    "Safety": 10,
+    "Economics": 20,
+    "TDD": 10,
+}
 
 
 def load_policy(path: str) -> dict[str, Any]:
@@ -85,8 +151,9 @@ def load_policy(path: str) -> dict[str, Any]:
     for key, item in value.items():
         if not isinstance(item, list) or not all(isinstance(v, str) for v in item):
             raise ValueError(f"inspection policy {key} must be a list of strings")
-        if key != "test_commands" and any(Path(v).is_absolute() or ".." in Path(v).parts
-                                          for v in item):
+        if key != "test_commands" and any(
+            Path(v).is_absolute() or ".." in Path(v).parts for v in item
+        ):
             raise ValueError(f"inspection policy {key} paths must stay within the repository")
     return value
 
@@ -110,8 +177,9 @@ def _simple_yaml(text: str) -> dict[str, list[str]]:
 
 def _tracked_files(repo: Path, ignored: set[str]) -> list[Path]:
     try:
-        proc = subprocess.run(["git", "-C", str(repo), "ls-files", "-z"], check=True,
-                              capture_output=True)
+        proc = subprocess.run(
+            ["git", "-C", str(repo), "ls-files", "-z"], check=True, capture_output=True
+        )
     except (subprocess.CalledProcessError, FileNotFoundError) as exc:
         raise ValueError(f"not a readable git repository: {repo}") from exc
     paths = []
@@ -160,6 +228,7 @@ def _symbols(path: Path) -> dict[str, list[int]]:
             value = json.loads(text)
         except json.JSONDecodeError:
             return {}
+
         def walk(item: Any) -> None:
             if isinstance(item, dict):
                 for key, child in item.items():
@@ -169,6 +238,7 @@ def _symbols(path: Path) -> dict[str, list[int]]:
             elif isinstance(item, list):
                 for child in item:
                     walk(child)
+
         walk(value)
     return found
 
@@ -181,8 +251,9 @@ def _tokens(value: str) -> set[str]:
 
 
 def _revision(repo: Path) -> str:
-    proc = subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"], check=True,
-                          capture_output=True, text=True)
+    proc = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
+    )
     return proc.stdout.strip()
 
 
@@ -213,16 +284,26 @@ def inspect_repository(path: str | Path, policy: dict[str, Any] | None = None) -
         refs = []
         for term in matched:
             refs.extend(index[term][:1])
-        refs = sorted({(r["path"], r["line"]): r for r in refs}.values(),
-                      key=lambda r: (r["path"], r["line"]))
+        refs = sorted(
+            {(r["path"], r["line"]): r for r in refs}.values(), key=lambda r: (r["path"], r["line"])
+        )
         status = "met" if passed else ("partial" if matched else "missing")
         awarded = rule.points if passed else 0
         category_scores[rule.category] += awarded
-        findings.append({"id": rule.id, "category": rule.category, "criterion": rule.id,
-                         "status": status, "severity": "info" if passed else "high",
-                         "points_awarded": awarded, "points_available": rule.points,
-                         "evidence": refs, "missing_capability": None if passed else rule.missing,
-                         "falsification_condition": rule.falsification})
+        findings.append(
+            {
+                "id": rule.id,
+                "category": rule.category,
+                "criterion": rule.id,
+                "status": status,
+                "severity": "info" if passed else "high",
+                "points_awarded": awarded,
+                "points_available": rule.points,
+                "evidence": refs,
+                "missing_capability": None if passed else rule.missing,
+                "falsification_condition": rule.falsification,
+            }
+        )
 
     safety_warnings = _safety_warnings(index)
     raw_score = sum(category_scores.values())
@@ -239,15 +320,23 @@ def inspect_repository(path: str | Path, policy: dict[str, Any] | None = None) -
     rating = "green" if score >= 80 else "amber" if score >= 50 else "red"
     proof_state = _proof_state(findings, safety_warnings)
     cost_plus = _cost_plus_state(index)
-    categories = [{"id": name, "score": category_scores[name], "max_score": maximum}
-                  for name, maximum in CATEGORY_MAX.items()]
+    categories = [
+        {"id": name, "score": category_scores[name], "max_score": maximum}
+        for name, maximum in CATEGORY_MAX.items()
+    ]
     return {
         "schema_version": SCHEMA_VERSION,
         "repository": {"name": repo.name, "revision": _revision(repo)},
-        "grade": {"score": score, "rating": rating, "raw_score": raw_score,
-                  "caps": [{"maximum": cap, "reason": reason} for cap, reason in sorted(caps)]},
-        "proof_state": proof_state, "cost_plus_state": cost_plus,
-        "categories": categories, "findings": findings,
+        "grade": {
+            "score": score,
+            "rating": rating,
+            "raw_score": raw_score,
+            "caps": [{"maximum": cap, "reason": reason} for cap, reason in sorted(caps)],
+        },
+        "proof_state": proof_state,
+        "cost_plus_state": cost_plus,
+        "categories": categories,
+        "findings": findings,
         "implementation_options": _implementation_options(findings, safety_warnings),
         "safety_warnings": safety_warnings,
         "disclaimer": "Repository structure indicates readiness; it is not proof of realized value.",
@@ -262,13 +351,23 @@ def _safety_warnings(index: dict[str, list[dict[str, Any]]]) -> list[dict[str, A
     sensitive = {"signal_content", "customer_payload", "raw_payload", "secret_value"}
     warnings = []
     for token in sorted(sensitive):
-        refs = [r for r in index.get(f"exact:{token}", []) if production_ref(r)
-                and any(word in r["path"].lower()
-                        for word in ("evidence", "report", "export", "scorecard"))]
+        refs = [
+            r
+            for r in index.get(f"exact:{token}", [])
+            if production_ref(r)
+            and any(
+                word in r["path"].lower() for word in ("evidence", "report", "export", "scorecard")
+            )
+        ]
         if refs:
-            warnings.append({"id": "DATA-001", "severity": "critical",
-                             "message": "Sensitive payload field appears in an evidence/report structure.",
-                             "evidence": refs[:3]})
+            warnings.append(
+                {
+                    "id": "DATA-001",
+                    "severity": "critical",
+                    "message": "Sensitive payload field appears in an evidence/report structure.",
+                    "evidence": refs[:3],
+                }
+            )
     # A signal payload persisted in a memory/evidence record is sensitive even when its
     # contract represents the two fields separately. Only paths and field names influence this.
     paths = {token: {r["path"] for r in refs} for token, refs in index.items()}
@@ -279,7 +378,8 @@ def _safety_warnings(index: dict[str, list[dict[str, Any]]]) -> list[dict[str, A
         persistence_paths |= paths.get(f"exact:{token}", set())
     persistence_names = ("memory", "evidence", "report", "export", "ledger", "state")
     raw_paths = sorted(
-        path for path in signal_paths & content_paths & persistence_paths
+        path
+        for path in signal_paths & content_paths & persistence_paths
         if production_ref({"path": path})
         if any(name in path.lower() for name in persistence_names)
     )
@@ -287,11 +387,17 @@ def _safety_warnings(index: dict[str, list[dict[str, Any]]]) -> list[dict[str, A
         refs = []
         for path in raw_paths[:3]:
             candidates = [r for r in index.get("exact:content", []) if r["path"] == path]
-            refs.append(candidates[0] if candidates else {"path": path, "line": 1,
-                                                          "kind": "structural"})
-        warnings.append({"id": "DATA-001", "severity": "critical",
-                         "message": "Raw signal content appears in a persisted evidence/memory structure.",
-                         "evidence": refs})
+            refs.append(
+                candidates[0] if candidates else {"path": path, "line": 1, "kind": "structural"}
+            )
+        warnings.append(
+            {
+                "id": "DATA-001",
+                "severity": "critical",
+                "message": "Raw signal content appears in a persisted evidence/memory structure.",
+                "evidence": refs,
+            }
+        )
     return warnings
 
 
@@ -312,38 +418,78 @@ def _cost_plus_state(index: dict[str, list[dict[str, Any]]]) -> str:
     return "risk" if risk else "scalable"
 
 
-def _implementation_options(findings: list[dict[str, Any]],
-                            safety_warnings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _implementation_options(
+    findings: list[dict[str, Any]], safety_warnings: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     gaps = [f["id"] for f in findings if f["status"] != "met"]
     gaps.extend(warning["id"] for warning in safety_warnings)
     if not gaps:
         return []
     if safety_warnings and not any(f["status"] != "met" for f in findings):
         return [
-            {"level": "minimum", "title": "Minimum privacy structure", "addresses": gaps,
-             "changes": ["Exclude raw payload fields from ROI exports and document retention."]},
-            {"level": "recommended", "title": "Privacy-safe persistence", "addresses": gaps,
-             "changes": ["Persist hashes and approved aggregates; migrate and expire raw evidence."]},
-            {"level": "advanced", "title": "Automated privacy governance", "addresses": gaps,
-             "changes": ["Enforce field allowlists, retention controls, and privacy contract tests."]},
+            {
+                "level": "minimum",
+                "title": "Minimum privacy structure",
+                "addresses": gaps,
+                "changes": ["Exclude raw payload fields from ROI exports and document retention."],
+            },
+            {
+                "level": "recommended",
+                "title": "Privacy-safe persistence",
+                "addresses": gaps,
+                "changes": [
+                    "Persist hashes and approved aggregates; migrate and expire raw evidence."
+                ],
+            },
+            {
+                "level": "advanced",
+                "title": "Automated privacy governance",
+                "addresses": gaps,
+                "changes": [
+                    "Enforce field allowlists, retention controls, and privacy contract tests."
+                ],
+            },
         ]
     return [
-        {"level": "minimum", "title": "Minimum evidence structure", "addresses": gaps,
-         "changes": ["Add versioned aggregate evidence fields and validation tests."]},
-        {"level": "recommended", "title": "Pilot-ready structure", "addresses": gaps,
-         "changes": ["Add a bounded usage ledger, independent baseline, safety gates, and effort ledger."]},
-        {"level": "advanced", "title": "Automated portfolio structure", "addresses": gaps,
-         "changes": ["Automate sanitized evidence receipts, cohort economics, and portfolio exports."]},
+        {
+            "level": "minimum",
+            "title": "Minimum evidence structure",
+            "addresses": gaps,
+            "changes": ["Add versioned aggregate evidence fields and validation tests."],
+        },
+        {
+            "level": "recommended",
+            "title": "Pilot-ready structure",
+            "addresses": gaps,
+            "changes": [
+                "Add a bounded usage ledger, independent baseline, safety gates, and effort ledger."
+            ],
+        },
+        {
+            "level": "advanced",
+            "title": "Automated portfolio structure",
+            "addresses": gaps,
+            "changes": [
+                "Automate sanitized evidence receipts, cohort economics, and portfolio exports."
+            ],
+        },
     ]
 
 
 def render_inspection_markdown(report: dict[str, Any]) -> str:
     grade = report["grade"]
-    lines = [f"# ROI Evidence Readiness — {report['repository']['name']}", "",
-             f"**{grade['rating'].upper()} — {grade['score']}/100**",
-             f"Proof state: **{report['proof_state']}**  ",
-             f"Cost-plus state: **{report['cost_plus_state']}**", "",
-             report["disclaimer"], "", "## Category scores", ""]
+    lines = [
+        f"# ROI Evidence Readiness — {report['repository']['name']}",
+        "",
+        f"**{grade['rating'].upper()} — {grade['score']}/100**",
+        f"Proof state: **{report['proof_state']}**  ",
+        f"Cost-plus state: **{report['cost_plus_state']}**",
+        "",
+        report["disclaimer"],
+        "",
+        "## Category scores",
+        "",
+    ]
     for category in report["categories"]:
         lines.append(f"- {category['id']}: {category['score']}/{category['max_score']}")
     lines += ["", "## Evidence gaps", ""]

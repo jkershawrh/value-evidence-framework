@@ -31,6 +31,7 @@ fi
 
 CASCADE_K8S_URL="${CASCADE_K8S_URL:?Set CASCADE_K8S_URL to the cascade-k8s route}"
 CASCADE_MEMORY_URL="${CASCADE_MEMORY_URL:-}"
+CASCADE_USAGE_URL="${CASCADE_USAGE_URL:-$CASCADE_K8S_URL/proof/usage}"
 
 OUTDIR="$(cd "$(dirname "$0")/.." && pwd)/soak-data"
 mkdir -p "$OUTDIR"
@@ -64,21 +65,21 @@ fetch() {
     # Classifier stats (comparison metrics + coverage SLI + hybrid margins)
     echo "  \"classifier_stats\": $(fetch 'classifier stats' "$CASCADE_K8S_URL/classifier/stats"),"
 
-    # Classifier comparisons (SC↔LLM disagreement samples for false-suppression tracking)
-    echo "  \"classifier_comparisons\": $(fetch 'classifier comparisons' "$CASCADE_K8S_URL/classifier/comparisons"),"
-
     # Agent status
     echo "  \"agents\": $(fetch 'agents' "$CASCADE_K8S_URL/agents"),"
 
     # Health
     echo "  \"health\": $(fetch 'health' "$CASCADE_K8S_URL/health"),"
 
+    # Payload-free cumulative usage. Start/end subtraction happens in soak-to-claim.py.
+    echo "  \"racmaas_usage\": $(fetch 'aggregate AI usage' "$CASCADE_USAGE_URL"),"
+
     # Memory stats (if memory URL is set)
     if [[ -n "$CASCADE_MEMORY_URL" ]]; then
         echo "  \"cascade_memory_url\": \"$CASCADE_MEMORY_URL\","
         echo "  \"memory_stats\": $(fetch 'memory stats' "$CASCADE_MEMORY_URL/memories/stats"),"
         echo "  \"memory_search_stats\": $(fetch 'memory search stats' "$CASCADE_MEMORY_URL/memories/search/stats"),"
-        echo "  \"biography\": $(fetch 'biography' "$CASCADE_MEMORY_URL/biography"),"
+        echo "  \"biography\": null,"
     else
         echo "  \"cascade_memory_url\": null,"
         echo "  \"memory_stats\": null,"
