@@ -3,6 +3,11 @@
 The first integration should be file-based and read-only. Each product exports one claim document
 from telemetry it already owns. CI validates the contract; it does not calculate favorable ROI.
 
+Start every integration with [the project intake](project-intake.md) and a report-only
+`vef inspect`. The intake owns semantic intent; the repository owns instrumentation and sanitized
+export; VEF owns deterministic validation and scoring. An adapter must not fill missing intake
+fields with favorable defaults.
+
 ## Candidate product claims
 
 - **GCL OSS (planned authoritative source):** harmful or infeasible actions rejected before commit;

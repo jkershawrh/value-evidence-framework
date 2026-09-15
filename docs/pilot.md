@@ -1,5 +1,9 @@
 # 90-day pilot
 
+Before phase 1, complete [the project intake](project-intake.md), run `vef inspect`, assign owners
+for every unknown, and pre-register the decision that each possible result will trigger. A pilot
+must not begin with an undefined customer outcome or a counterfactual chosen after results appear.
+
 ## Phase 1 — contract and shadow scorecard (weeks 1–3)
 
 Choose Cascade Compression's avoided model calls. Agree on outcome ID, workload boundary, unit
@@ -26,4 +30,3 @@ Hat scorecards with the same calculation kernel and different explanatory views.
 - Realization cost includes engineering, operations, enablement, and services.
 - Customer reviewer accepts or explicitly disputes every financial input.
 - Scorecard can render a negative result without special handling.
-

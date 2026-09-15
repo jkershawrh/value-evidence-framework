@@ -41,8 +41,9 @@ directional with limited gaps. Red means the value hypothesis is useful but not 
 ## Cost-plus test
 
 The internal scorecard compares confidence-adjusted value with fully loaded realization cost.
-That is necessary but insufficient. A future maturity dimension will also score marginal delivery
+That is necessary but insufficient. The readiness inspector separately checks for marginal delivery
 cost, customer-specific engineering, time-to-value, evidence automation, and cohort repeatability.
+Its cost-plus state is `unknown`, `risk`, or `scalable`; it is not derived from the readiness grade.
 High value that depends on proportional services labor is still a cost-plus warning.
 
 ## Value dimensions
@@ -67,6 +68,9 @@ the original VEF value path, now available as an explicit dimension.
 was not needed. Supports on-premises (capex + power + amortization) and cloud (token-based)
 modes. Sensible defaults from industry benchmarks (US EIA power rates, Uptime Institute PUE)
 are applied when inputs are not provided.
+
+Benchmark defaults support hypothesis exploration and sensitivity analysis only. They remain
+distinguishable from observed and customer-validated inputs and cannot make a claim decision-grade.
 
 **Human operational cost avoided.** Engineer time not spent triaging, investigating, and acting
 on signals. This is often the largest real-world cost for operational products. Defaults to
@@ -134,6 +138,10 @@ in measurement versus assumption.
 Every default value has a named source (e.g. "PagerDuty State of Digital Operations 2024",
 "Gartner IT operations benchmark"). When a product omits an optional input and the framework
 applies a default, the source is preserved in the dimension output. No default is silent.
+
+Defaults must never replace a missing product-specific counterfactual, actual AI participation,
+customer financial input, or realization cost. Those omissions remain `unknown` and fail financial
+claims closed.
 
 ### Schema
 

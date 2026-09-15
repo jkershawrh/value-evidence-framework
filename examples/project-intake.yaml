@@ -1,0 +1,128 @@
+schema_version: vef.project-intake.v1alpha1
+project:
+  name: example-product
+  repository: org/example-product
+  decision: "Decide whether to proceed to a bounded customer pilot"
+  audience: engineering
+  owners:
+    product_semantics: unknown
+    evidence: unknown
+    finance: unknown
+    privacy: unknown
+    customer_validation: unknown
+
+value_hypothesis:
+  capability: unknown
+  customer_observable_outcome: unknown
+  outcome_id: unknown
+  population: unknown
+  inclusion_rule: unknown
+  exclusions: []
+  unit: unknown
+  period: unknown
+  minimum_meaningful_improvement: unknown
+  falsification_condition: unknown
+
+evidence:
+  observed_events: []
+  failure_events: []
+  provenance: unknown
+  bounded_start_end_supported: unknown
+  unknown_state_supported: unknown
+  raw_storage: private
+  retention_policy: unknown
+  sanitized_export: unknown
+
+counterfactual:
+  method: unknown
+  independent_control: unknown
+  matched_population: unknown
+  matching_variables: []
+  competing_explanations: []
+  contamination_risks: []
+  invalidation_condition: unknown
+
+ai_usage:
+  applicable: unknown
+  total_population: unknown
+  ai_eligible_population: unknown
+  eligibility_basis: unknown
+  actual_requests: unknown
+  successful_requests: unknown
+  failures: unknown
+  retries: unknown
+  drops: unknown
+  unknown_usage: unknown
+  input_tokens: unknown
+  output_tokens: unknown
+  pricing_class: unknown
+  pricing_source: unknown
+
+attribution_and_safety:
+  product_share: unknown
+  other_contributors: []
+  dangerous_miss_definition: unknown
+  dangerous_miss_threshold: unknown
+  fail_closed_conditions: []
+  customer_validated: false
+
+economics:
+  currency: USD
+  financial_conversion: unknown
+  infrastructure_cost: unknown
+  inference_cost: unknown
+  enablement_cost: unknown
+  support_and_services_cost: unknown
+  human_transition_cost: unknown
+  engineering_effort:
+    - activity: ruleset_design
+      lifecycle: initial
+      hours: unknown
+      loaded_role_rate: unknown
+      source: unknown
+    - activity: ruleset_review
+      lifecycle: initial
+      hours: unknown
+      loaded_role_rate: unknown
+      source: unknown
+    - activity: ruleset_testing
+      lifecycle: initial
+      hours: unknown
+      loaded_role_rate: unknown
+      source: unknown
+    - activity: ruleset_deployment
+      lifecycle: initial
+      hours: unknown
+      loaded_role_rate: unknown
+      source: unknown
+    - activity: ruleset_monitoring
+      lifecycle: recurring
+      hours: unknown
+      loaded_role_rate: unknown
+      source: unknown
+    - activity: ruleset_maintenance
+      lifecycle: recurring
+      hours: unknown
+      loaded_role_rate: unknown
+      source: unknown
+  marginal_delivery_cost: unknown
+  automation_rate: unknown
+  cohort_reuse: unknown
+  time_to_value: unknown
+
+contracts_and_tests:
+  evidence_schema: unknown
+  claim_exporter: unknown
+  calculation_version: unknown
+  compatibility_tests: unknown
+  negative_result_tests: unknown
+  deterministic_replay: unknown
+
+pilot_acceptance:
+  success_threshold: unknown
+  failure_threshold: unknown
+  stop_conditions: []
+  privacy_approved: false
+  finance_approved: false
+  customer_approved: false
+  result_to_decision_mapping: unknown

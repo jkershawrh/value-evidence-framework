@@ -8,6 +8,10 @@ description: Assess a software repository's readiness to produce defensible ROI 
 Use the repository's `vef inspect` command as the authoritative grader. Run it against a local
 repository or consume an existing `vef.readiness.v1alpha1` JSON report.
 
+When the request asks about ROI **potential** or counterfactual feasibility, also request or consume
+a `vef.project-intake.v1alpha1` document based on `docs/project-intake.md`. The intake supplies
+product semantics and proposed evidence; it never changes or awards repository-readiness points.
+
 ## Invariants
 
 - Preserve the CLI's score, rating, proof state, cost-plus state, finding statuses, and caps exactly.
@@ -19,6 +23,8 @@ repository or consume an existing `vef.readiness.v1alpha1` JSON report.
 - Keep public OSS structure separate from private production evidence and deployment files. Direct
   raw evidence and customer economics to ignored or private storage.
 - Label uncertain product semantics instead of inferring them from names or compression ratios.
+- Report intake fields that are unsupported or marked `unknown`, with their owner and resolution
+  plan when provided. Never convert an intake assertion into observed evidence.
 
 ## Deliverable
 
@@ -30,3 +36,6 @@ Plans may identify likely integration points, interfaces, schemas, tests, rollou
 but must not implement changes. Missing measurements remain unknown rather than zero. Specifically
 include ruleset design, testing, deployment, monitoring, and maintenance effort when the economics
 finding is incomplete.
+
+Keep three conclusions separate in the deliverable: ROI potential, deterministic evidence
+readiness, and realized ROI. The last remains unproven until a validated bounded claim exists.
