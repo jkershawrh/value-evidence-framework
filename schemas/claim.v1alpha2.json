@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/jkershawrh/value-evidence-framework/schemas/claim.v1alpha2.json",
+  "title": "Value Evidence Framework claim v1alpha2",
+  "description": "Portable, evidence-first value claim. Decision-grade eligibility requires structured, reviewable sources and an observed counterfactual.",
+  "type": "object",
+  "required": [
+    "id",
+    "product",
+    "outcome_id",
+    "value_type",
+    "measurement",
+    "counterfactual",
+    "attribution",
+    "financial_model",
+    "evidence",
+    "realization_cost"
+  ],
+  "properties": {
+    "schema_version": {"const": "vef.claim.v1alpha2"},
+    "id": {"type": "string", "minLength": 1},
+    "product": {"type": "string", "minLength": 1},
+    "outcome_id": {"type": "string", "minLength": 1},
+    "value_type": {"type": "string", "minLength": 1},
+    "measurement": {"type": "object", "minProperties": 1},
+    "counterfactual": {
+      "type": "object",
+      "required": ["method", "expected_without_product"],
+      "properties": {
+        "method": {
+          "enum": [
+            "assertion",
+            "expert_estimate",
+            "modeled_baseline",
+            "historical_baseline",
+            "interrupted_time_series",
+            "difference_in_differences",
+            "matched_control",
+            "randomized_or_phased"
+          ]
+        },
+        "expected_without_product": {}
+      },
+      "additionalProperties": true
+    },
+    "attribution": {
+      "type": "object",
+      "required": ["product_share", "competing_factors"],
+      "properties": {
+        "product_share": {"type": "number", "minimum": 0, "maximum": 1},
+        "competing_factors": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        }
+      },
+      "additionalProperties": true
+    },
+    "financial_model": {
+      "type": "object",
+      "required": ["gross_value", "currency", "customer_validated"],
+      "properties": {
+        "gross_value": {"type": "number", "minimum": 0},
+        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+        "customer_validated": {"type": "boolean"},
+        "engineering_effort": {"type": "array"},
+        "value_dimensions": {"type": "array"}
+      },
+      "additionalProperties": true
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["confidence", "sources", "reproducible", "validation_state", "value_eligible"],
+      "properties": {
+        "confidence": {"enum": ["unverified", "low", "medium", "high"]},
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              {"type": "string", "minLength": 1},
+              {"$ref": "#/$defs/source"}
+            ]
+          }
+        },
+        "reproducible": {"type": "boolean"},
+        "validation_state": {
+          "enum": ["hypothesis", "candidate", "reviewed", "accepted", "rejected", "expired"]
+        },
+        "value_eligible": {"type": "boolean"}
+      },
+      "additionalProperties": true
+    },
+    "realization_cost": {"type": "number", "minimum": 0}
+  },
+  "additionalProperties": true,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "evidence": {
+            "properties": {"value_eligible": {"const": true}},
+            "required": ["value_eligible"]
+          }
+        },
+        "required": ["evidence"]
+      },
+      "then": {
+        "required": ["schema_version"],
+        "properties": {
+          "counterfactual": {
+            "properties": {
+              "method": {
+                "enum": [
+                  "historical_baseline",
+                  "interrupted_time_series",
+                  "difference_in_differences",
+                  "matched_control",
+                  "randomized_or_phased"
+                ]
+              }
+            }
+          },
+          "financial_model": {
+            "properties": {"customer_validated": {"const": true}}
+          },
+          "evidence": {
+            "properties": {
+              "confidence": {"enum": ["medium", "high"]},
+              "reproducible": {"const": true},
+              "validation_state": {"const": "accepted"},
+              "sources": {
+                "type": "array",
+                "minItems": 1,
+                "items": {"$ref": "#/$defs/source"}
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "source": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "uri",
+        "retrieved_at",
+        "confidence",
+        "validation_state"
+      ],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "kind": {
+          "enum": [
+            "product_telemetry",
+            "launchpad_receipt",
+            "customer_input",
+            "finance_input",
+            "industry_benchmark",
+            "validation_report"
+          ]
+        },
+        "uri": {"type": "string", "minLength": 1},
+        "content_sha256": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "locator": {"type": "string", "minLength": 1},
+        "geography": {"type": "string", "minLength": 1},
+        "effective_date": {"type": "string", "format": "date"},
+        "retrieved_at": {"type": "string", "format": "date-time"},
+        "unit": {"type": "string", "minLength": 1},
+        "transformation": {"type": "string", "minLength": 1},
+        "confidence": {"enum": ["unverified", "low", "medium", "high"]},
+        "validation_state": {
+          "enum": ["candidate", "reviewed", "accepted", "rejected", "expired"]
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {"properties": {"kind": {"const": "industry_benchmark"}}},
+          "then": {
+            "required": [
+              "locator",
+              "geography",
+              "effective_date",
+              "unit",
+              "transformation"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

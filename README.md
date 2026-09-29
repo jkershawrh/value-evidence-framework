@@ -46,6 +46,10 @@ backlog examples, not assertions of realized customer ROI.
 6. A historical test result is not current deployment evidence.
 7. Scorecards expose assumptions and missing evidence alongside results.
 
+The portable claim language is published as
+[`vef.claim.v1alpha2`](schemas/claim.v1alpha2.json). Its ownership and adapter
+boundary are documented in [the claim contract](docs/claim-contract.md).
+
 See [docs/methodology.md](docs/methodology.md), [docs/integration.md](docs/integration.md),
 [docs/project-intake.md](docs/project-intake.md), [docs/adoption-guide.md](docs/adoption-guide.md),
 [docs/pilot.md](docs/pilot.md), and [docs/readiness-inspector.md](docs/readiness-inspector.md).

@@ -27,3 +27,11 @@ Product repos own raw metrics, extraction, privacy, and semantic correctness. VE
 validation, portfolio attribution, confidence policy, calculation versions, and scorecard views.
 An immutable ledger may retain signed claim inputs and calculation receipts, but ledger inclusion
 proves integrity and provenance—not truth or causation.
+
+## Versioned contract
+
+Adapters targeting `vef.claim.v1alpha2` validate their emitted claim against
+[`schemas/claim.v1alpha2.json`](../schemas/claim.v1alpha2.json). See
+[the claim contract](claim-contract.md) for the fail-closed eligibility and source-provenance
+rules. An adapter may keep incomplete evidence visible as a hypothesis, but it must not mark the
+claim value-eligible until the stricter branch of the schema passes.
