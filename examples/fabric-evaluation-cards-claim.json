@@ -1,0 +1,76 @@
+{
+  "claims": [
+    {
+      "schema_version": "vef.claim.v1alpha2",
+      "id": "fabric.evaluation-card-coverage",
+      "product": "governed-agent-fabric",
+      "outcome_id": "outcome-checkable-capability-evidence",
+      "value_type": "evidence_coverage",
+      "measurement": {
+        "observed": 3,
+        "unit": "notarized evaluation cards",
+        "producers": 2,
+        "chain": "fabric.evaluation-card.v1",
+        "chain_verified": true
+      },
+      "counterfactual": {
+        "method": "historical_baseline",
+        "expected_without_product": 0,
+        "note": "Before the evaluation-card pipeline these workloads produced prose results documents with no checkable artifact, digest or receipt."
+      },
+      "attribution": {
+        "product_share": 1.0,
+        "competing_factors": [
+          "the same artifacts could be produced by hand with the same discipline and a standalone ledger client"
+        ]
+      },
+      "financial_model": {
+        "gross_value": 0,
+        "currency": "USD",
+        "customer_validated": false
+      },
+      "evidence": {
+        "confidence": "low",
+        "sources": [
+          {
+            "id": "evalcard-464acaa26504",
+            "kind": "evaluation_card",
+            "uri": "file:///Users/jkershaw/Documents/governed-agent-fabric-review/runs/evalcard-smoke/evaluation-card.json",
+            "content_sha256": "sha256:464acaa26504bbc00e83766382515556611962b90323d08728c515d4b6b1e8af",
+            "locator": "workload-pipeline:folsom-workload-suite-v1",
+            "retrieved_at": "2026-10-21T16:22:34.053958+00:00",
+            "confidence": "unverified",
+            "validation_state": "rejected",
+            "transformation": "fabric evaluation card; 7 system(s); best pass_all_k 1.0 over k in [1, 2]; evidence OFFLINE,REHEARSAL; verdict RED; card verdict is RED or no systems were measured"
+          },
+          {
+            "id": "evalcard-6ba9c0c55b67",
+            "kind": "evaluation_card",
+            "uri": "file:///Users/jkershaw/Documents/governed-agent-fabric-review/runs/indem-card-smoke/evaluation-card.json",
+            "content_sha256": "sha256:6ba9c0c55b67e2bcf469d3d3a8f0a2ada281d2e02bebcaf3bb552e662f7dd7ad",
+            "locator": "workload-pipeline:industry-emulator-seed-17-n-12",
+            "retrieved_at": "2026-10-21T17:57:33.133214+00:00",
+            "confidence": "unverified",
+            "validation_state": "rejected",
+            "transformation": "fabric evaluation card; 6 system(s); best pass_all_k 1.0 over k in [1]; evidence OFFLINE; verdict RED; card verdict is RED or no systems were measured"
+          },
+          {
+            "id": "evalcard-d540e5464fba",
+            "kind": "evaluation_card",
+            "uri": "file:///Users/jkershaw/Documents/agent-eval-101/runs/evaluation-card.json",
+            "content_sha256": "sha256:d540e5464fbad5cf3aef726a77d12ba6a6b7ad2f1b29e851c0195b9ac14c0aa4",
+            "locator": "workload-pipeline:agent-eval-101-triage-fixture",
+            "retrieved_at": "2026-10-21T17:59:02.262102+00:00",
+            "confidence": "low",
+            "validation_state": "candidate",
+            "transformation": "fabric evaluation card; 1 system(s); best pass_all_k 0.25 over k in [5]; evidence REHEARSAL; verdict AMBER; evidence labels are not all LIVE: REHEARSAL"
+          }
+        ],
+        "reproducible": true,
+        "validation_state": "candidate",
+        "value_eligible": false
+      },
+      "realization_cost": 0
+    }
+  ]
+}
