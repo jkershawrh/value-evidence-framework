@@ -35,6 +35,28 @@ geography, effective date, retrieval timestamp, unit, transformation,
 confidence, and validation state. This prevents a benchmark assumption from
 silently becoming sales copy.
 
+## Evaluation-card sources
+
+An `evaluation_card` source references a governed-agent-fabric evaluation
+card (`fabric.evaluation-card/v1`, pinned at
+[`schemas/fabric.evaluation-card.v1.json`](../schemas/fabric.evaluation-card.v1.json)).
+The card must validate against the pinned schema and carry a `card_sha256`
+that matches its body. `vef evalcard <card> --uri <uri>` validates the card
+and derives the structured source block, including `content_sha256`,
+`locator`, and a transformation summary with the best pass-all-k rate.
+
+VEF derives the source confidence from the card and never upgrades it:
+
+- a RED or failed verdict derives `rejected` / `unverified`;
+- LIVE evidence with claimable pass-all-k reliability for every system
+  derives `candidate` at `medium` at most;
+- anything else (rehearsal replay, unclaimable reliability, mixed labels)
+  derives `candidate` at `low`.
+
+Cards are machine-derived qualification evidence. They cannot make a claim
+`accepted`, cannot supply the `high` confidence tier, and are not current
+deployment evidence.
+
 ## Adapter conformance
 
 An adapter proves conformance by validating its emitted `claim` object against

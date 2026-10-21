@@ -157,6 +157,7 @@
           "enum": [
             "product_telemetry",
             "launchpad_receipt",
+            "evaluation_card",
             "customer_input",
             "finance_input",
             "industry_benchmark",
