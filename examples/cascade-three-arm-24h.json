@@ -1,0 +1,148 @@
+{
+ "_description": "Three-arm matched-control claim for cascade-compression 0.2.0rc7 on infra01 (2026-10-22). SUPersedes the earlier cascade cost-avoidance claims (examples/claims.json cascade.model-calls-avoided — modeled baseline; examples/cascade-infra01-pilot-24h.json cascade.full-business-impact — smaller pilot, and an ID that overclaimed its scope). Every number below was OBSERVED in the three-arm comparison over identical frozen inputs; none are modeled. Scope limits are binding: one cluster, 24 hours, deterministic tier only, engine digest-verified (0.2.0rc7 wheel b586e62d). The comparison was pre-registered: the dangerous-miss definition (final state of a recurring event hidden by suppression) was declared before the arms ran, and the synthetic rehearsal predicted the result shape.",
+ "_data_sources": {
+  "three_arm_report": "cascade-compression repo: three-arm-report.json (817,479 observations, 1,441 polls, 6 failed polls recorded, 5,019 unique events, capture digest frozen)",
+  "engine_identity": "released 0.2.0rc7, wheel sha256 b586e62d (digest-verified; no local-module substitution)",
+  "window": "24h, single cluster (infra01), Warning-stream workload dominated by actively recurring events"
+ },
+ "_supersedes": [
+  "cascade.model-calls-avoided (modeled baseline — weak counterfactual method, retired)",
+  "cascade.full-business-impact (matched control but smaller pilot window; ID overclaimed scope; retired)"
+ ],
+ "claims": [
+  {
+   "schema_version": "vef.claim.v1alpha2",
+   "id": "cascade.dangerous-miss-avoidance-24h",
+   "product": "cascade-compression",
+   "outcome_id": "infra01-three-arm:sha256:b586e62d:2026-10-22:quality",
+   "value_type": "risk_avoidance",
+   "measurement": {
+    "observed": 145,
+    "unit": "dangerous_misses_avoided_vs_naive_filter",
+    "period": "2026-10-22-24h",
+    "arm_a_actual_workflow": {
+     "retained": 817479,
+     "compression": 0.0,
+     "dangerous_misses": 0,
+     "note": "Baseline: everything delivered to an agent — what an everything-to-AI architecture pays"
+    },
+    "arm_b_naive_exact_repeat_filter": {
+     "retained": 5930,
+     "compression_pct": 99.3,
+     "dangerous_misses": 145,
+     "recurring_events_total": 215,
+     "note": "The naive filter collapses each actively recurring event to its first snapshot, hiding the final state of 145 of 215 recurring events (67%)"
+    },
+    "arm_c_candidate_rc7": {
+     "retained": 748787,
+     "compression_pct": 8.4,
+     "verified_dedupes": 68692,
+     "dangerous_misses": 0,
+     "note": "Verified-repeat-only suppression; the engine refuses to collapse growth, which is what makes it safe at zero misses"
+    },
+    "dangerous_miss_definition": "pre-registered: the final state of a recurring event is hidden by suppression (operator sees a day-old count while the problem is still growing)"
+   },
+   "counterfactual": {
+    "method": "matched_control",
+    "expected_without_product": 145,
+    "note": "Both alternatives measured on identical frozen inputs: the do-nothing baseline (arm A) and the naive filter an operator would otherwise reach for (arm B). This is the top of the counterfactual ladder available without randomized rollout."
+   },
+   "attribution": {
+    "product_share": 1.0,
+    "competing_factors": [
+      "a hand-tuned exact-repeat filter with growth-aware exceptions could close part of the gap, at the cost of bespoke per-stream engineering",
+      "the workload (recurring-warning-dominated stream) was favorable to the miss definition; other stream shapes may differ"
+    ]
+   },
+   "financial_model": {
+    "gross_value": 0,
+    "currency": "USD",
+    "customer_validated": false,
+    "note": "No financial model is claimed: the three-arm measured miss counts, not incident dollars. An incident-cost model would be a separate claim requiring its own baseline."
+   },
+   "evidence": {
+    "confidence": "medium",
+    "sources": [
+      {
+       "id": "three-arm-report-20261022",
+       "kind": "matched_control_report",
+       "uri": "file://cascade-compression/three-arm-report.json",
+       "engine_wheel_sha256": "b586e62d",
+       "observations": 817479
+      }
+    ],
+    "scope_limits": [
+      "one cluster (infra01), 24 hours",
+      "deterministic tier only (no LLM-tier arms)",
+      "215 recurring events is a small denominator for the miss-rate estimate",
+      "workload-shape dependent; not portable to dissimilar streams without re-measurement"
+    ]
+   },
+   "realization_cost": {
+    "fully_loaded": false,
+    "components": [
+      "engine deployment and collector wiring (already operational on infra01)",
+      "retention/storage for 748,787 retained observations per day per cluster (measured capture: ~514 MB/24h)",
+      "ledger write volume (~20/sec sustained, 13M+ entries accumulated over 75 days)"
+    ],
+    "note": "Infrastructure realization costs are observed but not yet priced into a net figure; a net-value claim requires pricing these components."
+   }
+  },
+  {
+   "schema_version": "vef.claim.v1alpha2",
+   "id": "cascade.verified-compression-24h",
+   "product": "cascade-compression",
+   "outcome_id": "infra01-three-arm:sha256:b586e62d:2026-10-22:cost",
+   "value_type": "cost_avoidance",
+   "measurement": {
+    "observed": 68692,
+    "unit": "verified_duplicate_observations_suppressed_per_day_per_cluster",
+    "period": "2026-10-22-24h",
+    "note_on_the_linkage": "The three-arm measured DUPLICATE SUPPRESSION, not model calls. Converting dedupes to model-calls-avoided depends on tier routing (which suppressed observations would otherwise have reached a model tier). This claim deliberately reports the measured quantity; the earlier model-calls figures (470, 8200) relied on tier-routing assumptions this evidence does not re-establish. A calls-avoided figure for this workload requires the routing ledger from a full-stack arm, which the deterministic-tier comparison did not include."
+   },
+   "counterfactual": {
+    "method": "matched_control",
+    "expected_without_product": 0,
+    "note": "Arm A (actual workflow) delivered all 817,479 observations; arm C suppressed 68,692 as verified duplicates with zero dangerous misses. Arm B suppressed far more (99.3%) but at 145 dangerous misses — compression volume is only claimable together with the miss count, which is why this claim and cascade.dangerous-miss-avoidance-24h are paired."
+   },
+   "attribution": {
+    "product_share": 1.0,
+    "competing_factors": [
+      "exact-repeat deduplication is achievable without this engine; the engine's contribution is suppressing only VERIFIED repeats (zero dangerous misses), not the raw dedupe count",
+      "most repeat volume on this stream is CHANGED observations (new information, correctly retained) — the 8.4% figure is the honest workload-specific ceiling, not a general compression rate"
+    ]
+   },
+   "financial_model": {
+    "gross_value": 0,
+    "currency": "USD",
+    "customer_validated": false,
+    "note": "No dollar figure is claimed: dedupe-to-call conversion is tier-routing dependent (see measurement.note_on_the_linkage) and per-call pricing is not customer-validated."
+   },
+   "evidence": {
+    "confidence": "medium",
+    "sources": [
+      {
+       "id": "three-arm-report-20261022",
+       "kind": "matched_control_report",
+       "uri": "file://cascade-compression/three-arm-report.json",
+       "engine_wheel_sha256": "b586e62d",
+       "observations": 817479
+      }
+    ],
+    "scope_limits": [
+      "one cluster, 24 hours, deterministic tier",
+      "8.4% is workload-shape dependent — recurring-warning-dominated stream; NOT a portable compression rate",
+      "measured in observations suppressed, not model calls (see linkage note)"
+    ]
+   },
+   "realization_cost": {
+    "fully_loaded": false,
+    "components": [
+      "same infrastructure components as the paired quality claim",
+      "verification compute for repeat verification (CPU-only, measured within the soak capture)"
+    ],
+    "note": "Paired with cascade.dangerous-miss-avoidance-24h; neither claim is complete without the other."
+   }
+  }
+ ]
+}
