@@ -1,9 +1,10 @@
 {
- "_description": "Three-arm matched-control claim for cascade-compression 0.2.0rc7 on infra01 (2026-10-22). SUPersedes the earlier cascade cost-avoidance claims (examples/claims.json cascade.model-calls-avoided — modeled baseline; examples/cascade-infra01-pilot-24h.json cascade.full-business-impact — smaller pilot, and an ID that overclaimed its scope). Every number below was OBSERVED in the three-arm comparison over identical frozen inputs; none are modeled. Scope limits are binding: one cluster, 24 hours, deterministic tier only, engine digest-verified (0.2.0rc7 wheel b586e62d). The comparison was pre-registered: the dangerous-miss definition (final state of a recurring event hidden by suppression) was declared before the arms ran, and the synthetic rehearsal predicted the result shape.",
+ "_description": "Three-arm matched-control claim for cascade-compression 0.2.0rc7, aggregated on infra01 from the PRODUCTION RHPDS fleet (2026-10-22). The signal population is platform-wide production volume from live RHPDS environments — real users' labs and demos — collected by the production collector set (babylon, agnosticv, poolboy, labagator, prometheus, k8s, aap, ceph, ovn, gitops, jira, confluence, git), not a synthetic or test load. The workload is operated by the claiming organization (RHPDS ops). SUPersedes the earlier cascade cost-avoidance claims (examples/claims.json cascade.model-calls-avoided — modeled baseline; examples/cascade-infra01-pilot-24h.json cascade.full-business-impact — smaller pilot, and an ID that overclaimed its scope). Every number below was OBSERVED in the three-arm comparison over identical frozen inputs; none are modeled. Scope limits are binding: one 24h window, production RHPDS fleet traffic aggregated at infra01, deterministic tier only, engine digest-verified (0.2.0rc7 wheel b586e62d). The comparison was pre-registered: the dangerous-miss definition (final state of a recurring event hidden by suppression) was declared before the arms ran, and the synthetic rehearsal predicted the result shape.",
  "_data_sources": {
   "three_arm_report": "cascade-compression repo: three-arm-report.json (817,479 observations, 1,441 polls, 6 failed polls recorded, 5,019 unique events, capture digest frozen)",
   "engine_identity": "released 0.2.0rc7, wheel sha256 b586e62d (digest-verified; no local-module substitution)",
-  "window": "24h, single cluster (infra01), Warning-stream workload dominated by actively recurring events"
+  "signal_origin": "production RHPDS fleet environments, aggregated at infra01 by the production collector set",
+  "window": "24h, production traffic, Warning-stream workload dominated by actively recurring events"
  },
  "_supersedes": [
   "cascade.model-calls-avoided (modeled baseline — weak counterfactual method, retired)",
@@ -24,7 +25,7 @@
      "retained": 817479,
      "compression": 0.0,
      "dangerous_misses": 0,
-     "note": "Baseline: everything delivered to an agent — what an everything-to-AI architecture pays"
+     "note": "Baseline: everything delivered to an agent — what an everything-to-AI architecture pays for production RHPDS fleet volume"
     },
     "arm_b_naive_exact_repeat_filter": {
      "retained": 5930,
@@ -72,7 +73,7 @@
       }
     ],
     "scope_limits": [
-      "one cluster (infra01), 24 hours",
+      "one 24h window over production RHPDS fleet signals (aggregated at infra01); operated by the claiming organization",
       "deterministic tier only (no LLM-tier arms)",
       "215 recurring events is a small denominator for the miss-rate estimate",
       "workload-shape dependent; not portable to dissimilar streams without re-measurement"
@@ -130,7 +131,7 @@
       }
     ],
     "scope_limits": [
-      "one cluster, 24 hours, deterministic tier",
+      "one 24h window, production RHPDS fleet traffic, deterministic tier",
       "8.4% is workload-shape dependent — recurring-warning-dominated stream; NOT a portable compression rate",
       "measured in observations suppressed, not model calls (see linkage note)"
     ]
